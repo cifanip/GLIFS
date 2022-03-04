@@ -1,4 +1,4 @@
-# Makefile # Malicious comments by Sagy go here
+# Makefile
 EXE = QUAFF_gnu
 
 COMPILER = mpifort
