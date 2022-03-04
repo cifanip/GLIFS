@@ -1,0 +1,20 @@
+flow 0
+
+N 513
+nprow 1
+npcol 1
+
+Tf 1.d-1
+dt 1.d-1
+input_folder 0
+write_interval -1
+dtout 1.d-1
+
+l_cut 20
+
+tol 1.d-10
+max_iter 100
+
+nu 1.d-5
+alpha 1.5d-2
+lf 4
