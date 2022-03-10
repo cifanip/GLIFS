@@ -300,14 +300,14 @@ contains
     complex(double_p) :: aux
     
     n=f%n
-    call allocate_array(r,1,n)
+    call allocate_array(r,1,lf)
     
     if (IS_MASTER) then
       call random_number(r)
       r=r*2.d0*pi
     end if
 
-    call MPI_Bcast(r,n,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    call MPI_Bcast(r,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
     
     call f0%cyclic_to_column(q)
     
@@ -330,8 +330,8 @@ contains
             exit
           end if
         
-          aux%re = cos(r(m+1))
-          aux%im = sin(r(m+1))
+          aux%re = cos(r(m))
+          aux%im = sin(r(m))
           q%m(row,j) = q%m(row,j)*aux
           
           j = j + 1
