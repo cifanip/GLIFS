@@ -33,8 +33,14 @@ module solver_mod
     !damping
     real(double_p) :: alpha
     
-    !turb. forcing term
-    type(cdmatrix) :: f
+    !magnitude forcing
+    real(double_p) :: fmag
+    
+    !turb. forcing matrix
+    type(cdmatrix) :: f0,f
+    
+    !forcing sph index
+    integer :: lf
 
     contains
       
@@ -79,6 +85,7 @@ contains
     call this%delta_w%delete(delete_mpi=.FALSE.)
     if (this%flow==H_TURB) then
       call this%f%delete(delete_mpi=.FALSE.)
+      call this%f0%delete(delete_mpi=.FALSE.)
     end if
     
   end subroutine
@@ -106,6 +113,11 @@ contains
     if (this%flow==H_TURB) then
       call pfile%read_parameter(this%nu,'nu')
       call pfile%read_parameter(this%alpha,'alpha')
+      call pfile%read_parameter(this%fmag,'fmag')
+      call pfile%read_parameter(this%lf,'lf')
+      if (this%lf>this%w%n-1) then
+        call abort_run('lf > N-1')
+      end if
     end if
     
     this%fields_dir = 'fields'
@@ -122,18 +134,33 @@ contains
     this%delta_w    = this%w
 
     if (this%flow==H_TURB) then
-      this%f = this%w
-      call this%lap%compute_hturb_forcing(this%f)
+      this%f  = this%w
+      this%f0 = this%w
+      call this%lap%init_hturb_forcing(this%fmag,this%lf,this%f0)
     end if
     
     !init vorticity
     if (this%w%is_stored(this%run_time%output_dir,this%fields_dir)) then
+    
       call this%w%read_from_disk(this%run_time%output_dir,this%fields_dir)
       if (IS_MASTER) then
         write(*,'(A)') 'Vorticity read from disk'
       end if
+      
     else
-      call this%lap%compute_ic(this%w)
+      
+      if (this%flow==EULER) then
+        call this%lap%compute_ic(this%w)
+      end if
+
+      if (this%flow==H_TURB) then
+        this%w%m=(0.d0,0.d0)
+      end if
+
+      if (IS_MASTER) then
+        write(*,'(A)') 'Vorticity initialized from given i.c.'
+      end if
+
     end if
     
   end subroutine
@@ -148,20 +175,24 @@ contains
 
       ts = MPI_Wtime()
       
-      call this%lap%apply_turb_forcing(this%w,&
-                                       this%f,&
-                                       0.5d0*this%run_time%dt,&
-                                       this%nu,&
-                                       this%alpha)
+      call this%lap%apply_hturb(this%w,&
+                                this%f,&
+                                this%f0,&
+                                this%lf,&
+                                0.5d0*this%run_time%dt,&
+                                this%nu,&
+                                this%alpha)
 
       call this%isomp_fpiter()
       call this%isomp_expl()
 
-      call this%lap%apply_turb_forcing(this%w,&
-                                       this%f,&
-                                       0.5d0*this%run_time%dt,&
-                                       this%nu,&
-                                       this%alpha)
+      call this%lap%apply_hturb(this%w,&
+                                this%f,&
+                                this%f0,&
+                                this%lf,&
+                                0.5d0*this%run_time%dt,&
+                                this%nu,&
+                                this%alpha)
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)

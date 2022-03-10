@@ -54,10 +54,10 @@ module lap_blk_mod
     
     procedure, public :: apply
     procedure, public :: apply_inv
-    procedure, public :: apply_turb_forcing
+    procedure, public :: apply_hturb
     procedure, public :: compute_ic
     procedure, public :: compute_sph_coeff
-    procedure, public :: compute_hturb_forcing
+    procedure, public :: init_hturb_forcing
     procedure :: add_q_component
     procedure :: compute_vort_component
     procedure :: init_dinfo
@@ -70,12 +70,12 @@ module lap_blk_mod
   
   private :: delete_lap_blk,&
              compute_ic,&
-             compute_hturb_forcing,&
+             init_hturb_forcing,&
              add_q_component,&
              init_dinfo,&
              apply,&
              apply_inv,&
-             apply_turb_forcing,&
+             apply_hturb,&
              compute_sph_coeff,&
              init_diags,&
              diags_to_buffer,&
@@ -90,7 +90,8 @@ module lap_blk_mod
              compute_vort_component,&
              frobenius_prod,&
              store_factorization,&
-             solve_inv_lap
+             solve_inv_lap,&
+             update_hturb_forcing
 
 contains
 
@@ -154,15 +155,18 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine apply_turb_forcing(this,w,f,dt,nu,alpha)
+  subroutine apply_hturb(this,w,f,f0,lf,dt,nu,alpha)
     class(lap_blk), intent(inout) :: this
-    type(cdmatrix), intent(inout) :: w
-    type(cdmatrix), intent(in) :: f
+    type(cdmatrix), intent(inout) :: w,f
+    type(cdmatrix), intent(in) :: f0
+    integer, intent(in) :: lf
     real(double_p) :: dt,nu,alpha,r,s
     integer :: i,j,k,n,n_diags,nrow,ncol
     
     n=this%n
     n_diags=size(this%d_midx)
+    
+    call update_hturb_forcing(this%q,f,f0,lf)
     
     call f%ptrm%copy_values(w)
     call this%apply(w)
@@ -199,10 +203,78 @@ contains
     end do
     !$OMP END PARALLEL DO
     
-    call this%buffer_to_diags(w)
+    call this%buffer_to_diags()
     call this%q%column_to_cyclic(w)
     call w%make_skewh()
 
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine update_hturb_forcing(q,f,f0,lf)
+    type(cdmatrix), intent(inout) :: q,f
+    type(cdmatrix), intent(in) :: f0
+    integer, intent(in) :: lf
+    real(double_p), allocatable, dimension(:) :: r
+    integer :: j,n,ierror,gcs,m,row,ncol
+    complex(double_p) :: aux
+    
+    n=f%n
+    call allocate_array(r,1,n)
+    
+    if (IS_MASTER) then
+      call random_number(r)
+      r=r*2.d0*pi
+    end if
+
+    call MPI_Bcast(r,n,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    
+    call f0%cyclic_to_column(q)
+    
+    gcs=get_gidx(1,q%ncblk,q%pcol,q%npcol)
+    ncol=q%ncol
+    
+    !$OMP PARALLEL DO DEFAULT(none) &
+    !$OMP SHARED(n,q,r,gcs,ncol,lf) &
+    !$OMP PRIVATE(m,row,j,aux)
+    do m=1,lf
+      
+      row = gcs + m
+      
+      if (row <= n) then
+      
+        j=1
+        do
+        
+          if ((row>n).OR.(j>ncol)) then
+            exit
+          end if
+        
+          aux%re = cos(r(m+1))
+          aux%im = sin(r(m+1))
+          q%m(row,j) = q%m(row,j)*aux
+          
+          j = j + 1
+          row = row + 1
+        
+        end do
+        
+      end if
+      
+    end do
+    !$OMP END PARALLEL DO
+
+    call q%column_to_cyclic(f)
+    call f%make_skewh()
+    
+    
+    call mpi_comm_rank(MPI_COMM_WORLD,j,ierror)
+    if (j==0) then
+      write(*,*) q%m(:,1)
+    end if
+    call mpi_barrier(MPI_COMM_WORLD,ierror)
+    call abort_run('stop')
+    
   end subroutine
 !========================================================================================!
 
@@ -232,7 +304,7 @@ contains
     end do
     !$OMP END PARALLEL DO
     
-    call this%buffer_to_diags(w)
+    call this%buffer_to_diags()
     call this%q%column_to_cyclic(w)
     call w%make_skewh()  
 
@@ -279,7 +351,7 @@ contains
     end do
     !$OMP END PARALLEL DO
     
-    call this%buffer_to_diags(w)
+    call this%buffer_to_diags()
     call this%q%column_to_cyclic(w)
     call w%make_skewh()
 
@@ -379,25 +451,23 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine compute_hturb_forcing(this,f)
+  subroutine init_hturb_forcing(this,fmag,lf,f)
     class(lap_blk), intent(inout) :: this
+    real(double_p), intent(in) :: fmag
+    integer, intent(in) :: lf
     type(cdmatrix), intent(inout) :: f
-    integer :: m,lf
+    integer :: m
     type(par_file) :: pfile
     complex(double_p) :: alpha,beta
     real(double_p) :: ts,te
     
-    call pfile%ctor('input_parameters','specs')
-    call pfile%read_parameter(lf,'lf')
-    
-    if (lf>this%n-1) then
-      call abort_run('lf > N-1')
-    end if
+    !init random generator
+    ! -- call random_seed()
     
     call f%set_to_zero()
     call this%q%set_to_zero()
 
-    do m=lf,this%n-1
+    do m=0,lf
 
       !call this%v%ctor(this%mpic,BLOCK_CYCLIC,.FALSE.,this%n-m)
       call this%v%ctor(this%mpic,BLOCK_CYCLIC,this%n-m,1,1)
@@ -413,6 +483,8 @@ contains
     
     call this%q%column_to_cyclic(f)
     call f%make_skewh()
+    
+    f%m = fmag*f%m
     
   end subroutine
 !========================================================================================!
@@ -623,22 +695,28 @@ contains
     
       l = m + (get_gidx(q,ncblk,pcol,npcol)-1)
       
+      if (l>l_ref) then
+        return
+      end if
+      
       if ((l==0).AND.(m==0)) then
         cycle
       end if
 
-      if (l.ne.l_ref) then
-        return
-      end if
+      if (l==l_ref) then
     
-      wh=hturbf_gen(m,l_ref)
+        wh=hturbf_gen(m,l_ref)
 
-      do p=1,size(dw(m)%idx,2)
-        i=dw(m)%idx(1,p)
-        j=dw(m)%idx(2,p)
-        jg=dw(m)%idx(3,p)
-        w(i,j)=w(i,j)+im*wh*eigv(jg,q)
-      end do
+        do p=1,size(dw(m)%idx,2)
+          i=dw(m)%idx(1,p)
+          j=dw(m)%idx(2,p)
+          jg=dw(m)%idx(3,p)
+          w(i,j)=w(i,j)+im*wh*eigv(jg,q)
+        end do
+        
+        return
+        
+      end if
     
     end do
 
@@ -1228,9 +1306,8 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine buffer_to_diags(this,w)
+  subroutine buffer_to_diags(this)
     class(lap_blk), intent(inout) :: this
-    type(cdmatrix), intent(in) :: w
     integer :: n,np,tag,gcs,p,ireq,nreq,ierror,is
     integer, allocatable, dimension(:,:) :: status
     integer, allocatable, dimension(:) :: requests

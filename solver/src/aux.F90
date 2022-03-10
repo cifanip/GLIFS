@@ -36,7 +36,7 @@ contains
     integer, intent(in) :: m,lf
     complex(double_p) :: f,f0,im
     
-    f0=(0.d0,0.d0)
+    f0=(1.d0,0.d0)
     
     f=f0
     
