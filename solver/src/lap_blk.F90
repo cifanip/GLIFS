@@ -750,8 +750,8 @@ contains
       
       !init inverse Laplacian
       call compute_tmat(n,m,this%tds(i)%d,e_aux)
-      call allocate_array(this%tds(i)%e,1,n-m)
-      call allocate_array(this%tds(i)%rhs,1,n-m)
+      call reallocate_array(this%tds(i)%e,1,n-m)
+      call reallocate_array(this%tds(i)%rhs,1,n-m)
       do j=1,n-m
         this%tds(i)%e(j)%re=e_aux(j)
         this%tds(i)%e(j)%im=0.d0
@@ -767,7 +767,7 @@ contains
 
         !init viscosity and damping
         call compute_tmat(n,m,this%tds(i)%dn,e_aux)
-        call allocate_array(this%tds(i)%en,1,n-m)
+        call reallocate_array(this%tds(i)%en,1,n-m)
         do j=1,n-m
           this%tds(i)%en(j)%re=-0.5d0*dt*nu*e_aux(j)
           this%tds(i)%en(j)%im=0.d0
@@ -1397,7 +1397,7 @@ contains
       
       gie = min(gis+ncol-1,n)
       d_size = gie - gis +1
-      call allocate_array(this%dw(m)%idx,1,4,1,d_size)
+      call reallocate_array(this%dw(m)%idx,1,4,1,d_size)
       
       do j=1,d_size
         this%dw(m)%idx(1,j)=gis+(j-1)
