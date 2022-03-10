@@ -211,74 +211,6 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine update_hturb_forcing(q,f,f0,lf)
-    type(cdmatrix), intent(inout) :: q,f
-    type(cdmatrix), intent(in) :: f0
-    integer, intent(in) :: lf
-    real(double_p), allocatable, dimension(:) :: r
-    integer :: j,n,ierror,gcs,m,row,ncol
-    complex(double_p) :: aux
-    
-    n=f%n
-    call allocate_array(r,1,n)
-    
-    if (IS_MASTER) then
-      call random_number(r)
-      r=r*2.d0*pi
-    end if
-
-    call MPI_Bcast(r,n,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
-    
-    call f0%cyclic_to_column(q)
-    
-    gcs=get_gidx(1,q%ncblk,q%pcol,q%npcol)
-    ncol=q%ncol
-    
-    !$OMP PARALLEL DO DEFAULT(none) &
-    !$OMP SHARED(n,q,r,gcs,ncol,lf) &
-    !$OMP PRIVATE(m,row,j,aux)
-    do m=1,lf
-      
-      row = gcs + m
-      
-      if (row <= n) then
-      
-        j=1
-        do
-        
-          if ((row>n).OR.(j>ncol)) then
-            exit
-          end if
-        
-          aux%re = cos(r(m+1))
-          aux%im = sin(r(m+1))
-          q%m(row,j) = q%m(row,j)*aux
-          
-          j = j + 1
-          row = row + 1
-        
-        end do
-        
-      end if
-      
-    end do
-    !$OMP END PARALLEL DO
-
-    call q%column_to_cyclic(f)
-    call f%make_skewh()
-    
-    
-    call mpi_comm_rank(MPI_COMM_WORLD,j,ierror)
-    if (j==0) then
-      write(*,*) q%m(:,1)
-    end if
-    call mpi_barrier(MPI_COMM_WORLD,ierror)
-    call abort_run('stop')
-    
-  end subroutine
-!========================================================================================!
-
-!========================================================================================!
   subroutine apply_inv(this,w)
     class(lap_blk), intent(inout) :: this
     type(cdmatrix), intent(inout) :: w
@@ -355,6 +287,66 @@ contains
     call this%q%column_to_cyclic(w)
     call w%make_skewh()
 
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine update_hturb_forcing(q,f,f0,lf)
+    type(cdmatrix), intent(inout) :: q,f
+    type(cdmatrix), intent(in) :: f0
+    integer, intent(in) :: lf
+    real(double_p), allocatable, dimension(:) :: r
+    integer :: j,n,ierror,gcs,m,row,ncol
+    complex(double_p) :: aux
+    
+    n=f%n
+    call allocate_array(r,1,n)
+    
+    if (IS_MASTER) then
+      call random_number(r)
+      r=r*2.d0*pi
+    end if
+
+    call MPI_Bcast(r,n,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    
+    call f0%cyclic_to_column(q)
+    
+    gcs=get_gidx(1,q%ncblk,q%pcol,q%npcol)
+    ncol=q%ncol
+    
+    !$OMP PARALLEL DO DEFAULT(none) &
+    !$OMP SHARED(n,q,r,gcs,ncol,lf) &
+    !$OMP PRIVATE(m,row,j,aux)
+    do m=1,lf
+      
+      row = gcs + m
+      
+      if (row <= n) then
+      
+        j=1
+        do
+        
+          if ((row>n).OR.(j>ncol)) then
+            exit
+          end if
+        
+          aux%re = cos(r(m+1))
+          aux%im = sin(r(m+1))
+          q%m(row,j) = q%m(row,j)*aux
+          
+          j = j + 1
+          row = row + 1
+        
+        end do
+        
+      end if
+      
+    end do
+    !$OMP END PARALLEL DO
+
+    call q%column_to_cyclic(f)
+    call f%make_skewh()
+    
   end subroutine
 !========================================================================================!
 
