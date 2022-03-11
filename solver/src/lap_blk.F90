@@ -775,9 +775,14 @@ contains
       if (flow==H_TURB) then
         !init Laplacian
         call compute_tmat(n,m,this%tds(i)%dl,this%tds(i)%el)
+        this%tds(i)%dl=-this%tds(i)%dl
+        this%tds(i)%el=-this%tds(i)%el
 
         !init viscosity and damping
         call compute_tmat(n,m,this%tds(i)%dn,e_aux)
+        this%tds(i)%dn=-this%tds(i)%dn
+        e_aux=-e_aux  
+        
         call reallocate_array(this%tds(i)%en,1,n-m)
         do j=1,n-m
           this%tds(i)%en(j)%re=-(1.d0-theta)*dt*nu*e_aux(j)
