@@ -41,6 +41,9 @@ module solver_mod
     
     !forcing sph index
     integer :: lf
+    
+    !theta-method hturb
+    real(double_p) :: theta
 
     contains
       
@@ -48,6 +51,7 @@ module solver_mod
     procedure, public :: ctor
     procedure, public :: solve_euler
     procedure, public :: solve_hturb
+    procedure :: isomp
     procedure :: isomp_fpiter
     procedure :: isomp_expl
 
@@ -59,6 +63,7 @@ module solver_mod
              solve_hturb,&
              isomp_fpiter,&
              isomp_expl,&
+             isomp,&
              info_run_cpu_time
              
   !outside of type
@@ -96,6 +101,8 @@ contains
     class(solver), intent(out) :: this
     type(par_file) :: pfile
     
+    call set_sigle_thread()
+    
     call this%mpic%ctor()
     call this%w%ctor(this%mpic,BLOCK_CYCLIC,'w',read_pgrid=.TRUE.)
     
@@ -115,6 +122,9 @@ contains
       call pfile%read_parameter(this%alpha,'alpha')
       call pfile%read_parameter(this%fmag,'fmag')
       call pfile%read_parameter(this%lf,'lf')
+      call pfile%read_parameter(this%theta,'theta')
+      !account for term \nu \omega
+      this%alpha = this%alpha - this%nu
       if (this%lf>this%w%n-1) then
         call abort_run('lf > N-1')
       end if
@@ -150,7 +160,7 @@ contains
     else
       
       if (this%flow==EULER) then
-        call this%lap%compute_ic(this%w)
+        call this%lap%compute_ic(this%w)        
       end if
 
       if (this%flow==H_TURB) then
@@ -181,18 +191,19 @@ contains
                                 this%lf,&
                                 0.5d0*this%run_time%dt,&
                                 this%nu,&
-                                this%alpha)
+                                this%alpha,&
+                                this%theta)
 
-      call this%isomp_fpiter()
-      call this%isomp_expl()
+     call this%isomp()
 
-      call this%lap%apply_hturb(this%w,&
-                                this%f,&
-                                this%f0,&
-                                this%lf,&
-                                0.5d0*this%run_time%dt,&
-                                this%nu,&
-                                this%alpha)
+     call this%lap%apply_hturb(this%w,&
+                               this%f,&
+                               this%f0,&
+                               this%lf,&
+                               0.5d0*this%run_time%dt,&
+                               this%nu,&
+                               this%alpha,&
+                               this%theta)
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)
@@ -202,7 +213,7 @@ contains
       te = MPI_Wtime()
     
       call info_run_cpu_time(ts,te)
-    
+
     end do
 
   end subroutine
@@ -218,8 +229,7 @@ contains
 
       ts = MPI_Wtime()
 
-      call this%isomp_fpiter()
-      call this%isomp_expl()
+      call this%isomp()
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)
@@ -237,8 +247,36 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine isomp_expl(this)
+  subroutine isomp(this,dt_opt)
     class(solver), intent(inout) :: this
+    real(double_p), intent(in), optional :: dt_opt
+    real(double_p) :: ts,te
+    
+    ts = MPI_Wtime()
+    
+    call this%isomp_fpiter(dt_opt)
+    call this%isomp_expl(dt_opt)   
+      
+    te = MPI_Wtime() 
+
+    if (IS_MASTER) then
+      write(*,'(A,'//output_format_(2:9)//')') '    ISOMP CPU TIME: ', te-ts
+    end if
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine isomp_expl(this,dt_opt)
+    class(solver), intent(inout) :: this
+    real(double_p), intent(in), optional :: dt_opt
+    real(double_p) :: dt
+    
+    if (present(dt_opt)) then
+      dt = dt_opt
+    else
+      dt = this%run_time%dt
+    end if
 
     !apply inverse laplacian
     call this%psi%copy_values(this%wt)
@@ -261,7 +299,7 @@ contains
                             this%psi_wt%m,     &
                             this%psi_wth%m,    &
                             this%psi_wt_psi%m, &
-                            this%run_time%dt,  &
+                            dt,                &
                             this%wt%nrow,      &
                             this%wt%ncol,      &
                             this%w%m)
@@ -272,11 +310,18 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine isomp_fpiter(this)
+  subroutine isomp_fpiter(this,dt_opt)
     class(solver), intent(inout) :: this
-    real(double_p) :: err
+    real(double_p), intent(in), optional :: dt_opt
+    real(double_p) :: dt,err
     integer :: iter
     logical :: converged
+
+    if (present(dt_opt)) then
+      dt = dt_opt
+    else
+      dt = this%run_time%dt
+    end if
     
     iter = 0
     converged = .FALSE.
@@ -306,7 +351,7 @@ contains
                             this%psi_wt%m,     &
                             this%psi_wth%m,    &
                             this%psi_wt_psi%m, &
-                            this%run_time%dt,  &
+                            dt,                &
                             this%wt%nrow,      &
                             this%wt%ncol,      &
                             this%wt%m)

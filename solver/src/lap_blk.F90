@@ -155,13 +155,15 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine apply_hturb(this,w,f,f0,lf,dt,nu,alpha)
+  subroutine apply_hturb(this,w,f,f0,lf,dt,nu,alpha,theta)
     class(lap_blk), intent(inout) :: this
     type(cdmatrix), intent(inout) :: w,f
     type(cdmatrix), intent(in) :: f0
     integer, intent(in) :: lf
-    real(double_p) :: dt,nu,alpha,r,s
+    real(double_p) :: dt,nu,alpha,theta,r,s,ts,te
     integer :: i,j,k,n,n_diags,nrow,ncol
+    
+    ts = MPI_Wtime()
     
     n=this%n
     n_diags=size(this%d_midx)
@@ -174,8 +176,8 @@ contains
     nrow=w%nrow
     ncol=w%ncol
     
-    r=0.5d0*dt*nu
-    s=0.5d0*dt*alpha
+    r=theta*dt*nu
+    s=theta*dt*alpha
 
     !$OMP PARALLEL DO DEFAULT(none) &
     !$OMP SHARED(nrow,ncol,dt,r,s,w,f) &
@@ -206,6 +208,12 @@ contains
     call this%buffer_to_diags()
     call this%q%column_to_cyclic(w)
     call w%make_skewh()
+
+    te = MPI_Wtime() 
+
+    if (IS_MASTER) then
+      write(*,'(A,'//output_format_(2:9)//')') '    APPLY H_TURB CPU TIME: ', te-ts
+    end if
 
   end subroutine
 !========================================================================================!
@@ -722,15 +730,18 @@ contains
     real(double_p), allocatable, dimension(:) :: d_aux,e_aux
     integer :: n,m,i,j,err
     type(par_file) :: pfile
-    real(double_p) :: dt,nu,alpha
+    real(double_p) :: dt,nu,alpha,theta
     
     if (flow==H_TURB) then
       call pfile%ctor('input_parameters','specs')
       call pfile%read_parameter(dt,'dt')
       call pfile%read_parameter(nu,'nu')
       call pfile%read_parameter(alpha,'alpha')
+      call pfile%read_parameter(theta,'theta')
       !symmetric strang splitting
       dt=0.5d0*dt
+      !account for term \nu \omega
+      alpha = alpha - nu
     end if
     
     if (.not.this%q%is_allocated) then
@@ -769,10 +780,11 @@ contains
         call compute_tmat(n,m,this%tds(i)%dn,e_aux)
         call reallocate_array(this%tds(i)%en,1,n-m)
         do j=1,n-m
-          this%tds(i)%en(j)%re=-0.5d0*dt*nu*e_aux(j)
+          this%tds(i)%en(j)%re=-(1.d0-theta)*dt*nu*e_aux(j)
           this%tds(i)%en(j)%im=0.d0
         end do
-        this%tds(i)%dn = -0.5d0*dt*nu*this%tds(i)%dn + 1.d0 +  0.5d0*dt*alpha
+        this%tds(i)%dn = -(1.d0-theta)*dt*nu*this%tds(i)%dn +1.d0 +&
+                          (1.d0-theta)*dt*alpha
         call store_factorization(this%tds(i)%dn,this%tds(i)%en)
       end if
       
