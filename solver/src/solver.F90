@@ -208,6 +208,7 @@ contains
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)
         call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
       end if
       
       te = MPI_Wtime()
