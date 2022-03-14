@@ -249,7 +249,7 @@ contains
 !========================================================================================!
   subroutine check_pgrid(n,pr,pc,grid_type)
     integer, intent(in) :: n,pr,pc,grid_type
-    integer :: nprow,npcol
+    integer :: qr,qc
     
     select case(grid_type)
       case(BLOCK_COLUMN)
@@ -262,18 +262,16 @@ contains
         end if
     end select
     
-    nprow=pr
-    nprow = ceiling(dble(n)/ceiling(dble(n)/dble(nprow)))
-    if (pr.ne.nprow) then
+    qr = (pr-1)*ceiling(dble(n)/dble(pr))
+    if (qr>n) then
       call abort_run('Invalid number of processor rows found in check_pgrid')
     end if
     if (ceiling(dble(n)/dble(pr))<1) then
       call abort_run('nrow < 1 found in set_2d_pgrid')
     end if
 
-    npcol=pc
-    npcol = ceiling(dble(n)/ceiling(dble(n)/dble(npcol)))
-    if (pc.ne.npcol) then
+    qc = (pc-1)*ceiling(dble(n)/dble(pc))
+    if (qc>n) then
       call abort_run('Invalid number of processor columns found in check_pgrid')
     end if
     if (ceiling(dble(n)/dble(pc))<1) then
