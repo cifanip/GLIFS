@@ -91,7 +91,8 @@ module lap_blk_mod
              frobenius_prod,&
              store_factorization,&
              solve_inv_lap,&
-             update_hturb_forcing
+             update_hturb_forcing_rphase,&
+             update_hturb_forcing_dW
 
 contains
 
@@ -168,7 +169,8 @@ contains
     n=this%n
     n_diags=size(this%d_midx)
     
-    call update_hturb_forcing(this%q,f,f0,lf)
+    !call update_hturb_forcing_rphase(this%q,f,f0,lf,dt)
+    call update_hturb_forcing_dW(this%q,f,f0,lf,dt)
     
     call f%ptrm%copy_values(w)
     call this%apply(w)
@@ -184,7 +186,7 @@ contains
     !$OMP PRIVATE(i,j)
     do j=1,ncol
       do i=1,nrow
-        w%m(i,j)=r*w%m(i,j) + (1.d0-s)*f%ptrm%m(i,j) + dt*f%m(i,j)
+        w%m(i,j)=r*w%m(i,j) + (1.d0-s)*f%ptrm%m(i,j) + f%m(i,j)
       end do
     end do
     !$OMP END PARALLEL DO
@@ -299,10 +301,11 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine update_hturb_forcing(q,f,f0,lf)
+  subroutine update_hturb_forcing_rphase(q,f,f0,lf,dt)
     type(cdmatrix), intent(inout) :: q,f
     type(cdmatrix), intent(in) :: f0
     integer, intent(in) :: lf
+    real(double_p), intent(in) :: dt
     real(double_p), allocatable, dimension(:) :: r
     integer :: j,n,ierror,gcs,m,row,ncol
     complex(double_p) :: aux
@@ -323,9 +326,9 @@ contains
     ncol=q%ncol
     
     !$OMP PARALLEL DO DEFAULT(none) &
-    !$OMP SHARED(n,q,r,gcs,ncol,lf) &
+    !$OMP SHARED(n,q,r,gcs,ncol,lf,dt) &
     !$OMP PRIVATE(m,row,j,aux)
-    do m=1,lf
+    do m=0,lf
       
       row = gcs + m
       
@@ -337,9 +340,88 @@ contains
           if ((row>n).OR.(j>ncol)) then
             exit
           end if
+          
+          if (m==0) then
+            aux%re = cos(r(m))
+            aux%im = 0.d0
+          else
+            aux%re = cos(r(m))
+            aux%im = sin(r(m))
+          end if
+          
+          q%m(row,j) = q%m(row,j)*aux*dt
+          
+          j = j + 1
+          row = row + 1
         
-          aux%re = cos(r(m))
-          aux%im = sin(r(m))
+        end do
+        
+      end if
+      
+    end do
+    !$OMP END PARALLEL DO
+
+    call q%column_to_cyclic(f)
+    call f%make_skewh()
+    
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine update_hturb_forcing_dW(q,f,f0,lf,dt)
+    type(cdmatrix), intent(inout) :: q,f
+    type(cdmatrix), intent(in) :: f0
+    integer, intent(in) :: lf
+    real(double_p), intent(in) :: dt
+    real(double_p), allocatable, dimension(:) :: r1,r2,u1,u2
+    integer :: j,n,ierror,gcs,m,row,ncol
+    complex(double_p) :: aux
+    
+    n=f%n
+    call allocate_array(r1,1,lf)
+    call allocate_array(r2,1,lf)
+    call allocate_array(u1,1,lf)
+    call allocate_array(u2,1,lf)
+    
+    if (IS_MASTER) then
+      call random_number(u1)
+      call random_number(u2)
+      r1=sqrt(-2.d0*log(u1))*cos(2.d0*pi*u2)*sqrt(dt/3.d0)
+      r2=sqrt(-2.d0*log(u1))*sin(2.d0*pi*u2)*sqrt(dt/3.d0)
+    end if
+
+    call MPI_Bcast(r1,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    call MPI_Bcast(r2,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    
+    call f0%cyclic_to_column(q)
+    
+    gcs=get_gidx(1,q%ncblk,q%pcol,q%npcol)
+    ncol=q%ncol
+    
+    !$OMP PARALLEL DO DEFAULT(none) &
+    !$OMP SHARED(n,q,r1,r2,gcs,ncol,lf,dt) &
+    !$OMP PRIVATE(m,row,j,aux)
+    do m=0,lf
+      
+      row = gcs + m
+      
+      if (row <= n) then
+      
+        j=1
+        do
+        
+          if ((row>n).OR.(j>ncol)) then
+            exit
+          end if
+          
+          if (m==0) then
+            aux%re = r1(m)
+            aux%im = 0.d0
+          else
+            aux%re = r1(m)
+            aux%im = r2(m)
+          end if
+          
           q%m(row,j) = q%m(row,j)*aux
           
           j = j + 1
