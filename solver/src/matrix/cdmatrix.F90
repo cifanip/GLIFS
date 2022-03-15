@@ -36,6 +36,7 @@ module cdmatrix_mod
     procedure, public :: inf_norm
     procedure, public :: l2_norm
     procedure, public :: subtract
+    procedure, public :: sum
     procedure, public :: set_to_zero
     procedure, public :: is_stored
     procedure :: set_global_indexes
@@ -62,6 +63,7 @@ module cdmatrix_mod
              inf_norm,&
              l2_norm,&
              subtract,&
+             sum,&
              set_to_zero,&
              set_global_indexes,&
              is_stored,&
@@ -406,6 +408,32 @@ contains
     do j=1,ncol
       do i=1,nrow
         this%m(i,j) = a%m(i,j) - b%m(i,j)
+      end do
+    end do
+    !$OMP END PARALLEL DO
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine sum(this,a,b)
+    class(cdmatrix), intent(inout) :: this
+    type(cdmatrix), intent(in) :: a,b
+    integer :: i,j,nrow,ncol
+    
+    if (.not.this%is_allocated) then
+      return
+    end if
+    
+    nrow = this%nrow
+    ncol = this%ncol
+
+    !$OMP PARALLEL DO DEFAULT(none) &
+    !$OMP SHARED(nrow,ncol,this,a,b) &
+    !$OMP PRIVATE(i,j)
+    do j=1,ncol
+      do i=1,nrow
+        this%m(i,j) = a%m(i,j) + b%m(i,j)
       end do
     end do
     !$OMP END PARALLEL DO
