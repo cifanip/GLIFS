@@ -533,12 +533,12 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine init_hturb_forcing(this,fmag,lf,f)
+  subroutine init_hturb_forcing(this,fmag,lf,dlf,f)
     class(lap_blk), intent(inout) :: this
     real(double_p), intent(in) :: fmag
-    integer, intent(in) :: lf
+    integer, intent(in) :: lf,dlf
     type(cdmatrix), intent(inout) :: f
-    integer :: m
+    integer :: m,l_max
     type(par_file) :: pfile
     complex(double_p) :: alpha,beta
     real(double_p) :: ts,te
@@ -549,7 +549,9 @@ contains
     call f%set_to_zero()
     call this%q%set_to_zero()
 
-    do m=0,lf
+    l_max = lf+dlf
+
+    do m=0,l_max
 
       !call this%v%ctor(this%mpic,BLOCK_CYCLIC,.FALSE.,this%n-m)
       call this%v%ctor(this%mpic,BLOCK_CYCLIC,this%n-m,1,1)
@@ -557,7 +559,7 @@ contains
       call compute_eigv(this%n,this%v%n,this%v%npcol,this%v%nrow,this%v%ncol,&
                         this%v%is_allocated,this%v%desc,this%v%m)
       
-      call this%add_q_component(this%q,lf,SPH_F)
+      call this%add_q_component(this%q,lf,SPH_F,dlf)
 
       call this%v%delete()
 
@@ -572,10 +574,11 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine add_q_component(this,w,l_ref,qbasis_op)
+  subroutine add_q_component(this,w,l_ref,qbasis_op,dl_ref)
     class(lap_blk), intent(in) :: this
     type(cdmatrix), intent(inout) :: w
     integer, intent(in) :: l_ref,qbasis_op
+    integer, intent(in), optional :: dl_ref
     type(rdmatrix) :: q
     real(double_p), allocatable, dimension(:,:) :: buff
     integer :: gn,n,m,i,ierror
@@ -621,7 +624,7 @@ contains
           call assemble_ic(m,l_ref,info(4),i,info(3),buff,this%dw,&
                            w%is_allocated,w%m)
         case(SPH_F)
-          call assemble_hturb_f(m,l_ref,info(4),i,info(3),buff,this%dw,&
+          call assemble_hturb_f(m,l_ref,dl_ref,info(4),i,info(3),buff,this%dw,&
                                 w%is_allocated,w%m)
         case default
       end select
@@ -753,8 +756,8 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine assemble_hturb_f(m,l_ref,ncblk,pcol,npcol,eigv,dw,is_allocated,w)
-    integer, intent(in) :: m,l_ref,ncblk,pcol,npcol
+  subroutine assemble_hturb_f(m,l_ref,dl_ref,ncblk,pcol,npcol,eigv,dw,is_allocated,w)
+    integer, intent(in) :: m,l_ref,dl_ref,ncblk,pcol,npcol
     real(double_p), allocatable, dimension(:,:), intent(in) :: eigv
     type(dinfo), allocatable, dimension(:), intent(in) :: dw
     logical, intent(in) :: is_allocated
@@ -777,17 +780,17 @@ contains
     
       l = m + (get_gidx(q,ncblk,pcol,npcol)-1)
       
-      if (l>l_ref) then
-        return
-      end if
-      
       if ((l==0).AND.(m==0)) then
         cycle
       end if
+      
+      if (l>l_ref+dl_ref) then
+        return
+      end if
 
-      if (l==l_ref) then
+      if ((l>=l_ref-dl_ref).AND.(l<=l_ref+dl_ref)) then
     
-        wh=hturbf_gen(m,l_ref)
+        wh=hturbf_gen(m,l,dl_ref,l_ref)
 
         do p=1,size(dw(m)%idx,2)
           i=dw(m)%idx(1,p)
@@ -795,8 +798,6 @@ contains
           jg=dw(m)%idx(3,p)
           w(i,j)=w(i,j)+im*wh*eigv(jg,q)
         end do
-        
-        return
         
       end if
     
