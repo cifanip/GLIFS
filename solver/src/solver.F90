@@ -179,7 +179,7 @@ contains
 !========================================================================================!
   subroutine solve_hturb(this)
     class(solver), intent(inout) :: this
-    real(double_p) :: ts,te
+    real(double_p) :: ts,te,l2W
 
     do while (this%run_time%loop())
 
@@ -203,13 +203,18 @@ contains
                                0.5d0*this%run_time%dt,&
                                this%nu,&
                                this%alpha,&
-                               this%theta)
+                               this%theta)                
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)
         call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
       end if
+      
+      l2W = this%w%l2_norm()
+      if (IS_MASTER) then
+        write(*,'(A,'//double_format_(2:10)//')') '    l2(W): ', l2W
+      end if 
       
       te = MPI_Wtime()
     
