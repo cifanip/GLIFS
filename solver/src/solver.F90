@@ -35,12 +35,15 @@ module solver_mod
     
     !magnitude forcing
     real(double_p) :: fmag
-    
-    !turb. forcing matrix
-    type(cdmatrix) :: f0,f
+
+    !turb. forcing matrices
+    type(cdmatrix), allocatable, dimension(:) :: f0
+
+    !resultant forcing matrix
+    type(cdmatrix) :: f
     
     !forcing sph index
-    integer :: lf
+    integer :: lf,dlf
     
     !theta-method hturb
     real(double_p) :: theta
@@ -90,7 +93,7 @@ contains
     call this%delta_w%delete(delete_mpi=.FALSE.)
     if (this%flow==H_TURB) then
       call this%f%delete(delete_mpi=.FALSE.)
-      call this%f0%delete(delete_mpi=.FALSE.)
+      deallocate(this%f0)      
     end if
     
   end subroutine
@@ -100,6 +103,7 @@ contains
   subroutine ctor(this)
     class(solver), intent(out) :: this
     type(par_file) :: pfile
+    integer :: err
     
     call set_sigle_thread()
     
@@ -128,6 +132,8 @@ contains
       if (this%lf>this%w%n-1) then
         call abort_run('lf > N-1')
       end if
+      !set \Delta l_2
+      this%dlf=2
     end if
     
     this%fields_dir = 'fields'
@@ -145,8 +151,11 @@ contains
 
     if (this%flow==H_TURB) then
       this%f  = this%w
-      this%f0 = this%w
-      call this%lap%init_hturb_forcing(this%fmag,this%lf,this%f0)
+      allocate(this%f0(2*this%dlf+1),stat=err)
+      if (err /= 0) then
+        call abort_run('Allocation of f0 in solver ctor failed ')
+      end if 
+      call this%lap%init_hturb_forcing(this%fmag,this%lf,this%dlf,this%f0)
     end if
     
     !init vorticity
@@ -189,6 +198,7 @@ contains
                                 this%f,&
                                 this%f0,&
                                 this%lf,&
+                                this%dlf,&
                                 0.5d0*this%run_time%dt,&
                                 this%nu,&
                                 this%alpha,&
@@ -200,10 +210,12 @@ contains
                                this%f,&
                                this%f0,&
                                this%lf,&
+                               this%dlf,&
                                0.5d0*this%run_time%dt,&
                                this%nu,&
                                this%alpha,&
-                               this%theta)                
+                               this%theta)
+                
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)

@@ -125,7 +125,7 @@ contains
     call deallocate_array(this%d_buff)
     
     deallocate(this%tds)
-    
+
     call this%q%delete()
     
   end subroutine
@@ -156,11 +156,11 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine apply_hturb(this,w,f,f0,lf,dt,nu,alpha,theta)
+  subroutine apply_hturb(this,w,f,f0,lf,dlf,dt,nu,alpha,theta)
     class(lap_blk), intent(inout) :: this
     type(cdmatrix), intent(inout) :: w,f
-    type(cdmatrix), intent(in) :: f0
-    integer, intent(in) :: lf
+    type(cdmatrix), intent(in), allocatable, dimension(:) :: f0
+    integer, intent(in) :: lf,dlf
     real(double_p) :: dt,nu,alpha,theta,r,s,ts,te
     integer :: i,j,k,n,n_diags,nrow,ncol
     
@@ -169,8 +169,7 @@ contains
     n=this%n
     n_diags=size(this%d_midx)
     
-    !call update_hturb_forcing_rphase(this%q,f,f0,lf,dt)
-    call update_hturb_forcing_dW(this%q,f,f0,lf,dt)
+    call update_hturb_forcing(f,this%q,f0,lf,dlf,dt)
     
     call f%ptrm%copy_values(w)
     call this%apply(w)
@@ -301,13 +300,38 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine update_hturb_forcing_rphase(q,f,f0,lf,dt)
-    type(cdmatrix), intent(inout) :: q,f
+  subroutine update_hturb_forcing(f,q,f0,lf,dlf,dt)
+    type(cdmatrix), intent(inout) :: f,q
+    type(cdmatrix), intent(in), allocatable, dimension(:) :: f0
+    integer, intent(in) :: lf,dlf
+    real(double_p), intent(in) :: dt
+    integer :: nmat,i,lfi
+    
+    call f%set_to_zero()
+    
+    nmat = size(f0)
+    
+    do i=1,nmat
+      
+      lfi = lf-dlf+i-1
+      
+      call update_hturb_forcing_rphase(f,q,f0(i),lfi,dlf,dt)
+      
+    end do
+    
+    call f%make_skewh()
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine update_hturb_forcing_rphase(f,q,f0,lf,dlf,dt)
+    type(cdmatrix), intent(inout) :: f,q
     type(cdmatrix), intent(in) :: f0
-    integer, intent(in) :: lf
+    integer, intent(in) :: lf,dlf
     real(double_p), intent(in) :: dt
     real(double_p), allocatable, dimension(:) :: r
-    integer :: j,n,ierror,gcs,m,row,ncol
+    integer :: j,n,ierror,gcs,m,row,ncol,l_max
     complex(double_p) :: aux
     
     n=f%n
@@ -320,7 +344,7 @@ contains
 
     call MPI_Bcast(r,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
     
-    call f0%cyclic_to_column(q)
+    call q%copy_values(f0)
     
     gcs=get_gidx(1,q%ncblk,q%pcol,q%npcol)
     ncol=q%ncol
@@ -361,17 +385,17 @@ contains
     end do
     !$OMP END PARALLEL DO
 
-    call q%column_to_cyclic(f)
-    call f%make_skewh()
+    call q%column_to_cyclic(f%ptrm)
+    call f%sum(f,f%ptrm)
     
   end subroutine
 !========================================================================================!
 
 !========================================================================================!
-  subroutine update_hturb_forcing_dW(q,f,f0,lf,dt)
-    type(cdmatrix), intent(inout) :: q,f
+  subroutine update_hturb_forcing_dW(f,q,f0,lf,dlf,dt)
+    type(cdmatrix), intent(inout) :: f,q
     type(cdmatrix), intent(in) :: f0
-    integer, intent(in) :: lf
+    integer, intent(in) :: lf,dlf
     real(double_p), intent(in) :: dt
     real(double_p), allocatable, dimension(:) :: r1,r2,u1,u2
     integer :: j,n,ierror,gcs,m,row,ncol
@@ -393,7 +417,7 @@ contains
     call MPI_Bcast(r1,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
     call MPI_Bcast(r2,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
     
-    call f0%cyclic_to_column(q)
+    call q%copy_values(f0)
     
     gcs=get_gidx(1,q%ncblk,q%pcol,q%npcol)
     ncol=q%ncol
@@ -434,8 +458,8 @@ contains
     end do
     !$OMP END PARALLEL DO
 
-    call q%column_to_cyclic(f)
-    call f%make_skewh()
+    call q%column_to_cyclic(f%ptrm)
+    call f%sum(f,f%ptrm)
     
   end subroutine
 !========================================================================================!
@@ -537,8 +561,8 @@ contains
     class(lap_blk), intent(inout) :: this
     real(double_p), intent(in) :: fmag
     integer, intent(in) :: lf,dlf
-    type(cdmatrix), intent(inout) :: f
-    integer :: m,l_max
+    type(cdmatrix), allocatable, dimension(:), intent(inout) :: f
+    integer :: m,lfi,i,nmat
     type(par_file) :: pfile
     complex(double_p) :: alpha,beta
     real(double_p) :: ts,te
@@ -546,29 +570,31 @@ contains
     !init random generator
     ! -- call random_seed()
     
-    call f%set_to_zero()
-    call this%q%set_to_zero()
-
-    l_max = lf+dlf
-
-    do m=0,l_max
-
-      !call this%v%ctor(this%mpic,BLOCK_CYCLIC,.FALSE.,this%n-m)
-      call this%v%ctor(this%mpic,BLOCK_CYCLIC,this%n-m,1,1)
-
-      call compute_eigv(this%n,this%v%n,this%v%npcol,this%v%nrow,this%v%ncol,&
-                        this%v%is_allocated,this%v%desc,this%v%m)
+    nmat = size(f)
+    
+    do i=1,nmat
       
-      call this%add_q_component(this%q,lf,SPH_F,dlf)
+      call f(i)%ctor(this%mpic,BLOCK_COLUMN,'htf',this%q%n,1,this%q%nprocs)
+      
+      lfi = lf-dlf+i-1
+      
+      do m=0,lfi
 
-      call this%v%delete()
+        !call this%v%ctor(this%mpic,BLOCK_CYCLIC,.FALSE.,this%n-m)
+        call this%v%ctor(this%mpic,BLOCK_CYCLIC,this%n-m,1,1)
 
+        call compute_eigv(this%n,this%v%n,this%v%npcol,this%v%nrow,this%v%ncol,&
+                          this%v%is_allocated,this%v%desc,this%v%m)
+      
+        call this%add_q_component(f(i),lfi,SPH_F,dlf)
+
+        call this%v%delete()
+
+      end do
+      
+      f(i)%m = fmag*f(i)%m
+      
     end do
-    
-    call this%q%column_to_cyclic(f)
-    call f%make_skewh()
-    
-    f%m = fmag*f%m
     
   end subroutine
 !========================================================================================!
@@ -784,11 +810,11 @@ contains
         cycle
       end if
       
-      if (l>l_ref+dl_ref) then
+      if (l>l_ref) then
         return
       end if
 
-      if ((l>=l_ref-dl_ref).AND.(l<=l_ref+dl_ref)) then
+      if (l==l_ref) then
     
         wh=hturbf_gen(m,l,dl_ref,l_ref)
 
