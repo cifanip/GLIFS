@@ -34,6 +34,7 @@ module cdmatrix_mod
     procedure, public :: multiply
     procedure, public :: multiply_h
     procedure, public :: inf_norm
+    procedure, public :: l2_norm
     procedure, public :: subtract
     procedure, public :: set_to_zero
     procedure, public :: is_stored
@@ -59,6 +60,7 @@ module cdmatrix_mod
              copy_values,&
              multiply,&
              inf_norm,&
+             l2_norm,&
              subtract,&
              set_to_zero,&
              set_global_indexes,&
@@ -429,12 +431,10 @@ contains
     
       m=this%n
       n=m
-    
-      if (this%is_allocated) then
-        iarow=indxg2p(1,this%nrblk,this%prow,0,this%nprow)
-        mp0=NUMROC(m,this%nrblk,this%prow,iarow,this%nprow)
-        call allocate_array(work,1,mp0)
-      end if
+
+      iarow=indxg2p(1,this%nrblk,this%prow,0,this%nprow)
+      mp0=NUMROC(m,this%nrblk,this%prow,iarow,this%nprow)
+      call allocate_array(work,1,mp0)
       
       call set_num_threads()
 
@@ -445,6 +445,41 @@ contains
     end if
     
     call mpi_bcast(r,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+
+  end function
+!========================================================================================!
+
+!========================================================================================!
+  function l2_norm(this) result(r)
+    class(cdmatrix), intent(in) :: this
+    integer :: n,nrow,ncol,i,j,ierror
+    real(double_p) :: r
+
+    if (this%is_allocated) then
+      
+      n=this%n
+      nrow=this%nrow
+      ncol=this%ncol
+      
+      r=0.d0
+      
+      !$OMP PARALLEL DO DEFAULT(none) &
+      !$OMP SHARED(nrow,ncol,this) &
+      !$OMP PRIVATE(i,j) &
+      !$OMP REDUCTION(+:r)
+      do j=1,ncol
+        do i=1,nrow
+          r = r + this%m(i,j)*conjg(this%m(i,j))
+        end do
+      end do
+      !$OMP END PARALLEL DO
+      
+      r = r/(n*n)
+      
+    end if
+    
+    call mpi_bcast(r,1,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    r = sqrt(r)
 
   end function
 !========================================================================================!
