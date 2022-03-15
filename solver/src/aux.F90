@@ -32,17 +32,16 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  function hturbf_gen(m,lf) result(f)
-    integer, intent(in) :: m,lf
-    complex(double_p) :: f,f0,im
+  function hturbf_gen(m,l,dlf,lf) result(f)
+    integer, intent(in) :: m,l,dlf,lf
+    real(double_p) :: a,b
+    complex(double_p) :: f
     
-    f0=(1.d0,0.d0)
+    a = (l-lf)*(l-lf)
+    b = 0.5d0*dlf*dlf/log(10.d0)
     
-    f=f0
-    
-    if (m==0) then
-      f%im = 0.d0
-    end if
+    f%re=exp(-a/b)
+    f%im=0.d0
 
   end function
 !========================================================================================!
