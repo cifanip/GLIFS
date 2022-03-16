@@ -91,6 +91,7 @@ module lap_blk_mod
              frobenius_prod,&
              store_factorization,&
              solve_inv_lap,&
+             solve_inv_lap_m0,&
              update_hturb_forcing_rphase,&
              update_hturb_forcing_dW
 
@@ -224,7 +225,7 @@ contains
     class(lap_blk), intent(inout) :: this
     type(cdmatrix), intent(inout) :: w
     complex(double_p), allocatable, dimension(:) :: rhs
-    integer :: i,n,s,n_diags
+    integer :: i,n,m,s,n_diags
     
     n=this%n
     n_diags=size(this%d_midx)
@@ -234,12 +235,17 @@ contains
     
     !$OMP PARALLEL DO DEFAULT(none) &
     !$OMP SHARED(n_diags,n,this) &
-    !$OMP PRIVATE(i,s)
+    !$OMP PRIVATE(i,m,s)
     do i=1,n_diags
     
-      s=n-this%d_midx(i)
+      m=this%d_midx(i)
+      s=n-m
       this%tds(i)%rhs=this%d_buff(i,1:s)
-      call solve_inv_lap(this%tds(i)%d,this%tds(i)%e,this%tds(i)%rhs)
+      if (m==0) then
+        call solve_inv_lap_m0(this%tds(i)%d,this%tds(i)%e,this%tds(i)%rhs)
+      else
+        call solve_inv_lap(this%tds(i)%d,this%tds(i)%e,this%tds(i)%rhs)
+      end if
       this%d_buff(i,1:s)=this%tds(i)%rhs
     
     end do
@@ -876,10 +882,9 @@ contains
         this%tds(i)%e(j)%re=e_aux(j)
         this%tds(i)%e(j)%im=0.d0
       end do
-      if (m==0) then
-        this%tds(i)%d(1)=this%tds(i)%d(1)+0.5d0
+      if (m>0) then
+        call store_factorization(this%tds(i)%d,this%tds(i)%e)
       end if
-      call store_factorization(this%tds(i)%d,this%tds(i)%e)
       
       if (flow==H_TURB) then
         !init Laplacian
@@ -940,6 +945,38 @@ contains
     if (info.ne.0) then
       call abort_run('zpttrs in lap_blk failed',info)
     end if
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine solve_inv_lap_m0(d,e,rhs)
+    real(double_p), allocatable, dimension(:), intent(in) :: d
+    complex(double_p), allocatable, dimension(:), intent(in) :: e
+    complex(double_p), allocatable, dimension(:), intent(inout) :: rhs
+    complex(double_p), allocatable, dimension(:) :: aux
+    real(double_p) :: r,r0,w
+    integer :: i,n
+    
+    n=size(d)
+    call allocate_array(aux,1,n)
+
+    r=1.d0/d(1)
+    rhs(1)=r*rhs(1)
+    aux(1)=1.d0
+    do i=2,n
+      r0=1.d0/d(i-1)
+      r=1.d0/d(i)
+      w=e(i-1)*r/aux(i-1)
+      aux(i)=1.d0-w*r0*e(i-1)
+      rhs(i)=r*rhs(i)-w*rhs(i-1)
+    end do
+    rhs(n)=0.d0
+    do i=n-1,1,-1
+      r=1.d0/d(i)
+      rhs(i)=(rhs(i)-r*e(i)*rhs(i+1))/aux(i)
+    end do
+    rhs=rhs-sum(rhs)/n
 
   end subroutine
 !========================================================================================!
