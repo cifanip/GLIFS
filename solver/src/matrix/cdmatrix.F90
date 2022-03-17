@@ -269,12 +269,12 @@ contains
     beta=(1.d0,0.d0)
     call copy_values(this%ptrm,this)
      
-    call set_num_threads()
+    call set_blas_multiple_threads()
 
     call PZTRANC(this%n,this%n,alpha,this%ptrm%m,1,1,this%ptrm%desc,beta,&
                  this%m,1,1,this%desc)
      
-    call set_sigle_thread()
+    call set_blas_sigle_thread()
 
   end subroutine
 !========================================================================================!
@@ -292,11 +292,11 @@ contains
     alpha=(1.d0,0.0)
     beta=(0.d0,0.d0)
     
-    call set_num_threads()
+    call set_blas_multiple_threads()
     
     call PZTRANC(this%n,this%n,alpha,a%m,1,1,a%desc,beta,this%m,1,1,this%desc) 
     
-    call set_sigle_thread()
+    call set_blas_sigle_thread()
 
   end subroutine
 !========================================================================================!
@@ -319,12 +319,12 @@ contains
     alpha=(1.d0,0.d0)
     beta=(0.d0,0.d0)
     
-    call set_num_threads()
+    call set_blas_multiple_threads()
 
     call pzgemm('N','N',m,n,k,alpha,a%m,1,1,a%desc,b%m,1,1,b%desc,beta,&
                  this%m,1,1,this%desc)
 
-    call set_sigle_thread()
+    call set_blas_sigle_thread()
 
   end subroutine
 !========================================================================================!
@@ -351,12 +351,12 @@ contains
     s = (0.d0,1.d0)
     call a%s_mul(s)
     
-    call set_num_threads()
+    call set_blas_multiple_threads()
 
     call pzhemm('R','L',m,n,alpha,a%m,1,1,a%desc,b%m,1,1,b%desc,beta,&
                 this%m,1,1,this%desc)
 
-    call set_sigle_thread()
+    call set_blas_sigle_thread()
     
     a%m=a%ptrm%m
 
@@ -464,11 +464,11 @@ contains
       mp0=NUMROC(m,this%nrblk,this%prow,iarow,this%nprow)
       call allocate_array(work,1,mp0)
       
-      call set_num_threads()
+      call set_blas_multiple_threads()
 
       r=pzlange('I',m,n,this%m,1,1,this%desc,work)
       
-      call set_sigle_thread()
+      call set_blas_sigle_thread()
       
     end if
     
