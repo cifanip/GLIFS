@@ -82,7 +82,7 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine set_num_threads()
+  subroutine set_blas_multiple_threads()
 #ifdef CMP_INTEL
     call mkl_set_num_threads(N_THREADS)
 #endif
@@ -93,7 +93,7 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine set_sigle_thread()
+  subroutine set_blas_sigle_thread()
 #ifdef CMP_INTEL
     call mkl_set_num_threads(1)
 #endif

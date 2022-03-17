@@ -105,7 +105,7 @@ contains
     type(par_file) :: pfile
     integer :: err
     
-    call set_sigle_thread()
+    call set_blas_sigle_thread()
     
     call this%mpic%ctor()
     call this%w%ctor(this%mpic,BLOCK_CYCLIC,'w',read_pgrid=.TRUE.)
@@ -295,6 +295,9 @@ contains
     else
       dt = this%run_time%dt
     end if
+    
+    !scale commutator
+    dt=dt*(this%w%n**(1.5d0))/sqrt(16.d0*pi)
 
     !apply inverse laplacian
     call this%psi%copy_values(this%wt)
@@ -340,6 +343,9 @@ contains
     else
       dt = this%run_time%dt
     end if
+
+    !scale commutator
+    dt=dt*(this%w%n**(1.5d0))/sqrt(16.d0*pi)
     
     iter = 0
     converged = .FALSE.

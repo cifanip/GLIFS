@@ -1079,11 +1079,11 @@ contains
     lwork=int(work(1))
     call reallocate_array(work,1,lwork)
     
-    call set_num_threads()
+    call set_blas_multiple_threads()
     
     call PDSTEDC('I',n,d,e,v,iq,jq,desc,work,lwork,iwork,liwork,info)
     
-    call set_sigle_thread()
+    call set_blas_sigle_thread()
 
     if (info.ne.0) then
       call abort_run('subroutine PDSTEDC in lap_blk failed',info)
