@@ -9,13 +9,13 @@ module aux_mod
 contains
 
 !========================================================================================!
-  function ic_gen(m,l,l_cut) result(w)
+  function ic_gen_test(m,l,l_cut) result(w)
     integer, intent(in) :: m,l,l_cut
     complex(double_p) :: w,w0,im
     real(double_p) :: k
     
     if (l>l_cut) then
-      w0=(0.d0,0.d0)
+      w=(0.d0,0.d0)
       return
     end if
     
@@ -25,6 +25,38 @@ contains
     w=w0/(abs(w0)*k)
     
     if (m==0) then
+      w%im = 0.d0
+    end if
+
+  end function
+!========================================================================================!
+
+!========================================================================================!
+  function ic_gen_hturb(m,l,l_min,l_max) result(w)
+    integer, intent(in) :: m,l,l_min,l_max
+    real(double_p), dimension(2) :: r
+    real(double_p) :: w_ref,w_mag
+    complex(double_p) :: w
+    
+    if ((l>l_max).OR.(l<l_min)) then
+      w=(0.d0,0.d0)
+      return
+    end if
+    
+    w_ref = 1.d-2
+    w_mag = sqrt(2.d0*w_ref/(2.d0*l+1.d0))
+    
+    !randomize module
+    call random_number(r)
+    r(1) = r(1) - 0.5d0
+    w_mag = (1.d0 + r(1)*0.4d0)*w_mag
+    
+    !randomize phase
+    w%re = w_mag*cos(2.d0*pi*r(2))
+    w%im = w_mag*sin(2.d0*pi*r(2))
+    
+    if (m==0) then
+      w%re = w_mag
       w%im = 0.d0
     end if
 
