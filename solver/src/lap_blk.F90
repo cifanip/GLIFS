@@ -537,7 +537,7 @@ contains
     integer :: m,v_size
     
     v_size=sph_size(this%n)
-    call om%ctor(this%mpic,'sphc',v_size,w%nprocs)
+    call om%ctor(this%mpic,trim(adjustl(w%fname))//'_sphc',v_size,w%nprocs)
     
     call w%cyclic_to_column(this%q)
     
