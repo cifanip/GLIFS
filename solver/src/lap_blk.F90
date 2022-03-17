@@ -7,8 +7,10 @@ module lap_blk_mod
   
   implicit none
   
-  integer, parameter :: SPH_IC = 1
-  integer, parameter :: SPH_F  = 2
+  !i.c. vorticity and forcing
+  integer, parameter :: SPH_IC_TEST  = 1
+  integer, parameter :: SPH_IC_HTURB = 2
+  integer, parameter :: SPH_F        = 3
 
   !auxiliary type (diagonal points info)
   type :: dinfo
@@ -471,19 +473,29 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine compute_ic(this,w)
+  subroutine compute_ic(this,w,qbasis_op)
     class(lap_blk), intent(inout) :: this
     type(cdmatrix), intent(inout) :: w
-    integer :: m,l_cut
+    integer, intent(in) :: qbasis_op
+    integer :: m,l_min,l_max
     type(par_file) :: pfile
     complex(double_p) :: alpha,beta
     real(double_p) :: ts,te
     
     call pfile%ctor('input_parameters','specs')
-    call pfile%read_parameter(l_cut,'l_cut')
+    call pfile%read_parameter(l_min,'l_min')
+    call pfile%read_parameter(l_max,'l_max')
     
-    if (l_cut>this%n-1) then
-      call abort_run('l_cut > N-1')
+    if (l_max>this%n-1) then
+      call abort_run('l_max > N-1')
+    end if
+    if (l_min<1) then
+      call abort_run('l_min < 1')
+    end if
+    
+    if ((qbasis_op.ne.SPH_IC_TEST).AND.&
+        (qbasis_op.ne.SPH_IC_HTURB)) then
+        call abort_run('Invalid I.C. requested')
     end if
     
     if (IS_MASTER) then
@@ -495,7 +507,7 @@ contains
     
     call this%q%set_to_zero()
 
-    do m=0,this%n-1
+    do m=0,l_max
     
       if (IS_MASTER) then
         write(*,'(A,I5)') 'Solving eigv problem: ', m
@@ -509,7 +521,7 @@ contains
       call compute_eigv(this%n,this%v%n,this%v%npcol,this%v%nrow,this%v%ncol,&
                         this%v%is_allocated,this%v%desc,this%v%m)
       
-      call this%add_q_component(this%q,l_cut,SPH_IC)
+      call this%add_q_component(this%q,l_min,l_max,qbasis_op)
 
       call this%v%delete()
 
@@ -574,7 +586,7 @@ contains
     real(double_p) :: ts,te
     
     !init random generator
-    call random_seed()
+    ! --call random_seed()
     
     nmat = size(f)
     
@@ -592,7 +604,7 @@ contains
         call compute_eigv(this%n,this%v%n,this%v%npcol,this%v%nrow,this%v%ncol,&
                           this%v%is_allocated,this%v%desc,this%v%m)
       
-        call this%add_q_component(f(i),lfi,SPH_F,dlf)
+        call this%add_q_component(f(i),lfi,lfi,SPH_F,dlf)
 
         call this%v%delete()
 
@@ -606,10 +618,10 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine add_q_component(this,w,l_ref,qbasis_op,dl_ref)
+  subroutine add_q_component(this,w,l_ref_min,l_ref_max,qbasis_op,dl_ref)
     class(lap_blk), intent(in) :: this
     type(cdmatrix), intent(inout) :: w
-    integer, intent(in) :: l_ref,qbasis_op
+    integer, intent(in) :: l_ref_min,l_ref_max,qbasis_op
     integer, intent(in), optional :: dl_ref
     type(rdmatrix) :: q
     real(double_p), allocatable, dimension(:,:) :: buff
@@ -652,11 +664,11 @@ contains
       call MPI_BCAST(buff,size(buff),MPI_DOUBLE_PRECISION,i,MPI_COMM_WORLD,ierror)
       
       select case(qbasis_op)
-        case(SPH_IC)
-          call assemble_ic(m,l_ref,info(4),i,info(3),buff,this%dw,&
-                           w%is_allocated,w%m)
+        case(SPH_IC_TEST,SPH_IC_HTURB)
+          call assemble_ic(m,l_ref_min,l_ref_max,info(4),i,info(3),buff,&
+                           this%dw,w%is_allocated,qbasis_op,w%m)
         case(SPH_F)
-          call assemble_hturb_f(m,l_ref,dl_ref,info(4),i,info(3),buff,this%dw,&
+          call assemble_hturb_f(m,l_ref_max,dl_ref,info(4),i,info(3),buff,this%dw,&
                                 w%is_allocated,w%m)
         case default
       end select
@@ -741,11 +753,12 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine assemble_ic(m,l_cut,ncblk,pcol,npcol,eigv,dw,is_allocated,w)
-    integer, intent(in) :: m,l_cut,ncblk,pcol,npcol
+  subroutine assemble_ic(m,l_min,l_max,ncblk,pcol,npcol,eigv,dw,is_allocated,qbasis_op,w)
+    integer, intent(in) :: m,l_min,l_max,ncblk,pcol,npcol
     real(double_p), allocatable, dimension(:,:), intent(in) :: eigv
     type(dinfo), allocatable, dimension(:), intent(in) :: dw
     logical, intent(in) :: is_allocated
+    integer, intent(in) :: qbasis_op
     complex(double_p), allocatable, dimension(:,:), intent(inout) :: w
     complex(double_p) :: im,wh
     integer :: p,q,i,j,jg,l
@@ -769,18 +782,24 @@ contains
         cycle
       end if
 
-      if (l>l_cut) then
-        return
-      end if
-    
-      wh=ic_gen(m,l,l_cut)
+      if ((l>=l_min).AND.(l<=l_max)) then
+      
+        select case(qbasis_op)
+          case(SPH_IC_TEST)
+            wh=ic_gen_test(m,l,l_max)
+          case(SPH_IC_HTURB)
+            wh=ic_gen_hturb(m,l,l_min,l_max)
+          case default
+        end select
 
-      do p=1,size(dw(m)%idx,2)
-        i=dw(m)%idx(1,p)
-        j=dw(m)%idx(2,p)
-        jg=dw(m)%idx(3,p)
-        w(i,j)=w(i,j)+im*wh*eigv(jg,q)
-      end do
+        do p=1,size(dw(m)%idx,2)
+          i=dw(m)%idx(1,p)
+          j=dw(m)%idx(2,p)
+          jg=dw(m)%idx(3,p)
+          w(i,j)=w(i,j)+im*wh*eigv(jg,q)
+        end do
+        
+      end if
     
     end do
 
