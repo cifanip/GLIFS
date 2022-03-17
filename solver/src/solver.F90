@@ -169,11 +169,11 @@ contains
     else
       
       if (this%flow==EULER) then
-        call this%lap%compute_ic(this%w)        
+        call this%lap%compute_ic(this%w,SPH_IC_TEST)     
       end if
 
       if (this%flow==H_TURB) then
-        this%w%m=(0.d0,0.d0)
+        call this%lap%compute_ic(this%w,SPH_IC_HTURB)
       end if
 
       if (IS_MASTER) then
