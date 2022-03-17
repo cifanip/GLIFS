@@ -372,7 +372,7 @@ contains
           end if
           
           if (m==0) then
-            aux%re = cos(r(m))
+            aux%re = 1.d0
             aux%im = 0.d0
           else
             aux%re = cos(r(m))
@@ -445,7 +445,7 @@ contains
           end if
           
           if (m==0) then
-            aux%re = r1(m)
+            aux%re = 1.d0
             aux%im = 0.d0
           else
             aux%re = r1(m)
@@ -574,7 +574,7 @@ contains
     real(double_p) :: ts,te
     
     !init random generator
-    ! -- call random_seed()
+    call random_seed()
     
     nmat = size(f)
     
