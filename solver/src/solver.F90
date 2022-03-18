@@ -108,7 +108,7 @@ contains
     call set_blas_sigle_thread()
     
     !init random generator
-    !call random_seed()
+    call random_seed()
     
     call this%mpic%ctor()
     call this%w%ctor(this%mpic,BLOCK_CYCLIC,'w',read_pgrid=.TRUE.)
@@ -173,7 +173,7 @@ contains
     else
       
       if (this%flow==EULER) then
-        call this%lap%compute_ic(this%w,SPH_IC_TEST)     
+        call this%lap%compute_ic(this%w,SPH_IC_EULER)     
       end if
 
       if (this%flow==H_TURB) then
@@ -252,7 +252,7 @@ contains
 
       ts = MPI_Wtime()
 
-      call this%isomp()
+      !call this%isomp()
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)

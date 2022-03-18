@@ -6,6 +6,9 @@ module aux_mod
 
   real(double_p), parameter :: pi=4.d0*datan(1.d0)
   
+  !random numbers for init i.c. euler
+  real(double_p), allocatable, dimension(:,:,:) :: rnd_ic_euler
+  
   !random numbers for init i.c. h turbulence
   real(double_p), allocatable, dimension(:,:,:) :: rnd_ic_hturb
   
@@ -28,6 +31,40 @@ contains
     w=w0/(abs(w0)*k)
     
     if (m==0) then
+      w%im = 0.d0
+    end if
+
+  end function
+!========================================================================================!
+
+!========================================================================================!
+  function ic_gen_euler(m,l,l_min,l_max) result(w)
+    integer, intent(in) :: m,l,l_min,l_max
+    real(double_p) :: w_ref,w_mag
+    complex(double_p) :: w
+    
+    if ((l>l_max).OR.(l<l_min)) then
+      w=(0.d0,0.d0)
+      return
+    end if
+    
+    w_ref = 1.d-2
+    w_mag = sqrt(2.d0*w_ref/((2.d0*l+1.d0)))
+    
+    !randomize module
+    rnd_ic_euler(1,l,m) = rnd_ic_euler(1,l,m) - 0.5d0
+    w_mag = (1.d0 + rnd_ic_euler(1,l,m)*0.4d0)*w_mag
+    
+    !randomize phase
+    w%re = (w_mag/sqrt(2.d0))*cos(2.d0*pi*rnd_ic_euler(2,l,m))
+    w%im = (w_mag/sqrt(2.d0))*sin(2.d0*pi*rnd_ic_euler(2,l,m))
+    
+    if (m==0) then
+      if (rnd_ic_euler(1,l,m)>=0.d0) then
+        w%re = w_mag
+      else
+        w%re = -w_mag
+      end if
       w%im = 0.d0
     end if
 

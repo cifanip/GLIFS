@@ -8,7 +8,8 @@ module lap_blk_mod
   implicit none
   
   !i.c. vorticity and forcing
-  integer, parameter :: SPH_IC_TEST  = 1
+  integer, parameter :: SPH_IC_TEST  = 0
+  integer, parameter :: SPH_IC_EULER = 1
   integer, parameter :: SPH_IC_HTURB = 2
   integer, parameter :: SPH_F        = 3
 
@@ -503,6 +504,7 @@ contains
     end if
     
     if ((qbasis_op.ne.SPH_IC_TEST).AND.&
+        (qbasis_op.ne.SPH_IC_EULER).AND.&
         (qbasis_op.ne.SPH_IC_HTURB)) then
         call abort_run('Invalid I.C. requested')
     end if
@@ -516,13 +518,23 @@ contains
     
     call this%q%set_to_zero()
     
-    !init random numbers ofr h turb
+    !init random numbers for h turb
     if (qbasis_op==SPH_IC_HTURB) then
       call allocate_array(rnd_ic_hturb,1,2,l_min,l_max,0,l_max)
       if (IS_MASTER) then
         call random_number(rnd_ic_hturb)
       end if
       call MPI_Bcast(rnd_ic_hturb,size(rnd_ic_hturb),MPI_DOUBLE_PRECISION,&
+                     0,MPI_COMM_WORLD,ierror)
+    end if
+    
+    !init random numbers for euler
+    if (qbasis_op==SPH_IC_EULER) then
+      call allocate_array(rnd_ic_euler,1,2,l_min,l_max,0,l_max)
+      if (IS_MASTER) then
+        call random_number(rnd_ic_euler)
+      end if
+      call MPI_Bcast(rnd_ic_euler,size(rnd_ic_euler),MPI_DOUBLE_PRECISION,&
                      0,MPI_COMM_WORLD,ierror)
     end if
 
@@ -680,7 +692,7 @@ contains
       call MPI_BCAST(buff,size(buff),MPI_DOUBLE_PRECISION,i,MPI_COMM_WORLD,ierror)
       
       select case(qbasis_op)
-        case(SPH_IC_TEST,SPH_IC_HTURB)
+        case(SPH_IC_TEST,SPH_IC_EULER,SPH_IC_HTURB)
           call assemble_ic(m,l_ref_min,l_ref_max,info(4),i,info(3),buff,&
                            this%dw,w%is_allocated,qbasis_op,w%m)
         case(SPH_F)
@@ -803,6 +815,8 @@ contains
         select case(qbasis_op)
           case(SPH_IC_TEST)
             wh=ic_gen_test(m,l,l_max)
+          case(SPH_IC_EULER)
+            wh=ic_gen_euler(m,l,l_min,l_max)
           case(SPH_IC_HTURB)
             wh=ic_gen_hturb(m,l,l_min,l_max)
           case default
