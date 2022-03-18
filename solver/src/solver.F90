@@ -252,7 +252,7 @@ contains
 
       ts = MPI_Wtime()
 
-      !call this%isomp()
+      call this%isomp()
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)
