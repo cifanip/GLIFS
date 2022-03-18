@@ -107,6 +107,9 @@ contains
     
     call set_blas_sigle_thread()
     
+    !init random generator
+    !call random_seed()
+    
     call this%mpic%ctor()
     call this%w%ctor(this%mpic,BLOCK_CYCLIC,'w',read_pgrid=.TRUE.)
     
@@ -151,6 +154,7 @@ contains
 
     if (this%flow==H_TURB) then
       this%f  = this%w
+      call this%f%rename('f')
       allocate(this%f0(2*this%dlf+1),stat=err)
       if (err /= 0) then
         call abort_run('Allocation of f0 in solver ctor failed ')
@@ -221,6 +225,7 @@ contains
         call this%run_time%write_out(this%fields_dir)
         call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
+        call this%lap%compute_sph_coeff(this%f,this%run_time%output_dir,this%fields_dir)
       end if
       
       l2W = this%w%l2_norm()
