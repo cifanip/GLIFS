@@ -374,7 +374,7 @@ contains
           end if
           
           if (m==0) then
-            aux%re = 1.d0
+            aux%re = sqrt(2.d0)
             aux%im = 0.d0
           else
             aux%re = cos(r(m))

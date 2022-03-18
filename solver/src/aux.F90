@@ -53,8 +53,8 @@ contains
     w_mag = (1.d0 + rnd_ic_hturb(1,l,m)*0.4d0)*w_mag
     
     !randomize phase
-    w%re = w_mag*cos(2.d0*pi*rnd_ic_hturb(2,l,m))
-    w%im = w_mag*sin(2.d0*pi*rnd_ic_hturb(2,l,m))
+    w%re = (w_mag/sqrt(2.d0))*cos(2.d0*pi*rnd_ic_hturb(2,l,m))
+    w%im = (w_mag/sqrt(2.d0))*sin(2.d0*pi*rnd_ic_hturb(2,l,m))
     
     if (m==0) then
       w%re = w_mag
