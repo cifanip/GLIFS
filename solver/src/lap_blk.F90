@@ -477,7 +477,7 @@ contains
     class(lap_blk), intent(inout) :: this
     type(cdmatrix), intent(inout) :: w
     integer, intent(in) :: qbasis_op
-    integer :: m,l_min,l_max
+    integer :: m,l_min,l_max,ierror
     type(par_file) :: pfile
     complex(double_p) :: alpha,beta
     real(double_p) :: ts,te
@@ -506,6 +506,16 @@ contains
     ts = MPI_Wtime()
     
     call this%q%set_to_zero()
+    
+    !init random numbers ofr h turb
+    if (qbasis_op==SPH_IC_HTURB) then
+      call allocate_array(rnd_ic_hturb,1,2,l_min,l_max,0,l_max)
+      if (IS_MASTER) then
+        call random_number(rnd_ic_hturb)
+      end if
+      call MPI_Bcast(rnd_ic_hturb,size(rnd_ic_hturb),MPI_DOUBLE_PRECISION,&
+                     0,MPI_COMM_WORLD,ierror)
+    end if
 
     do m=0,l_max
     
@@ -584,9 +594,6 @@ contains
     type(par_file) :: pfile
     complex(double_p) :: alpha,beta
     real(double_p) :: ts,te
-    
-    !init random generator
-    ! --call random_seed()
     
     nmat = size(f)
     

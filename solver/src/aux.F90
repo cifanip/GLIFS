@@ -6,6 +6,9 @@ module aux_mod
 
   real(double_p), parameter :: pi=4.d0*datan(1.d0)
   
+  !random numbers for init i.c. h turbulence
+  real(double_p), allocatable, dimension(:,:,:) :: rnd_ic_hturb
+  
 contains
 
 !========================================================================================!
@@ -34,7 +37,6 @@ contains
 !========================================================================================!
   function ic_gen_hturb(m,l,l_min,l_max) result(w)
     integer, intent(in) :: m,l,l_min,l_max
-    real(double_p), dimension(2) :: r
     real(double_p) :: w_ref,w_mag
     complex(double_p) :: w
     
@@ -47,13 +49,12 @@ contains
     w_mag = sqrt(2.d0*w_ref/(2.d0*l+1.d0))
     
     !randomize module
-    call random_number(r)
-    r(1) = r(1) - 0.5d0
-    w_mag = (1.d0 + r(1)*0.4d0)*w_mag
+    rnd_ic_hturb(1,l,m) = rnd_ic_hturb(1,l,m) - 0.5d0
+    w_mag = (1.d0 + rnd_ic_hturb(1,l,m)*0.4d0)*w_mag
     
     !randomize phase
-    w%re = w_mag*cos(2.d0*pi*r(2))
-    w%im = w_mag*sin(2.d0*pi*r(2))
+    w%re = w_mag*cos(2.d0*pi*rnd_ic_hturb(2,l,m))
+    w%im = w_mag*sin(2.d0*pi*rnd_ic_hturb(2,l,m))
     
     if (m==0) then
       w%re = w_mag
