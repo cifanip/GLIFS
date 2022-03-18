@@ -379,6 +379,7 @@ contains
             else
               aux%re = -sqrt(2.d0)
             end if
+            aux%im = 0.d0
           else
             aux%re = cos(r(m))
             aux%im = sin(r(m))
