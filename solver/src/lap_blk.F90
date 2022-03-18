@@ -374,8 +374,11 @@ contains
           end if
           
           if (m==0) then
-            aux%re = sqrt(2.d0)
-            aux%im = 0.d0
+            if (r(m)>=0.5d0) then
+              aux%re = sqrt(2.d0)
+            else
+              aux%re = -sqrt(2.d0)
+            end if
           else
             aux%re = cos(r(m))
             aux%im = sin(r(m))
@@ -446,8 +449,13 @@ contains
             exit
           end if
           
+          !case m==0 to be fixed later (update_hturb_forcing_dW used instead)
           if (m==0) then
-            aux%re = 1.d0
+            if (u1(m)>=0.5d0) then
+              aux%re = 1.d0
+            else
+              aux%re = -1.d0
+            end if
             aux%im = 0.d0
           else
             aux%re = r1(m)

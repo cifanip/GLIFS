@@ -57,7 +57,11 @@ contains
     w%im = (w_mag/sqrt(2.d0))*sin(2.d0*pi*rnd_ic_hturb(2,l,m))
     
     if (m==0) then
-      w%re = w_mag
+      if (rnd_ic_hturb(1,l,m)>=0.d0) then
+        w%re = w_mag
+      else
+        w%re = -w_mag
+      end if
       w%im = 0.d0
     end if
 
