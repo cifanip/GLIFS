@@ -41,11 +41,13 @@ module matrix_mod
     procedure, public :: init_matrix
     procedure, public :: delete_matrix
     procedure, public :: equal_matrix
+    procedure, public :: rename
 
   end type
   
   private :: init_matrix,&
-             delete_matrix
+             delete_matrix,&
+             rename
              
   public :: set_1d_pgrid,&
             set_2d_pgrid,&
@@ -145,6 +147,16 @@ contains
       call pfile%read_parameter(this%n,'N')
     end if
      
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine rename(this,new_name)
+    class(matrix), intent(inout) :: this
+    character(len=*), intent(in) :: new_name
+    
+    this%fname = new_name
+
   end subroutine
 !========================================================================================!
 
@@ -249,7 +261,7 @@ contains
 !========================================================================================!
   subroutine check_pgrid(n,pr,pc,grid_type)
     integer, intent(in) :: n,pr,pc,grid_type
-    integer :: qr,qc
+    integer :: qr,qc    
     
     select case(grid_type)
       case(BLOCK_COLUMN)
@@ -261,7 +273,7 @@ contains
           call abort_run('pc > 1 found in BLOCK_ROW check_pgrid')
         end if
     end select
-    
+
     qr = (pr-1)*ceiling(dble(n)/dble(pr))
     if (qr>n) then
       call abort_run('Invalid number of processor rows found in check_pgrid')
