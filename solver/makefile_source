@@ -47,7 +47,7 @@ $(OBJDIR)/rdmatrix.o: $(SOURCE)/matrix/rdmatrix.F90 $(OBJDIR)/dmatrix.o
 $(OBJDIR)/cdmatrix.o: $(SOURCE)/matrix/cdmatrix.F90 $(OBJDIR)/dmatrix.o
 	$(COMPILER) -c $(FLAGS) $< -o $@
 
-$(OBJDIR)/vector.o: $(SOURCE)/matrix/vector.F90
+$(OBJDIR)/vector.o: $(SOURCE)/matrix/vector.F90 $(OBJDIR)/matrix.o
 	$(COMPILER) -c $(FLAGS) $< -o $@
 
 $(OBJDIR)/lap_blk.o: $(SOURCE)/lap_blk.F90 $(OBJDIR)/rdmatrix.o $(OBJDIR)/cdmatrix.o \
