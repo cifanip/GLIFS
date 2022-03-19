@@ -351,7 +351,7 @@ contains
       r=r*2.d0*pi
     end if
 
-    call MPI_Bcast(r,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    call MPI_Bcast(r,size(r),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
     
     call q%copy_values(f0)
     
@@ -427,8 +427,8 @@ contains
       r2=sqrt(-2.d0*log(u1))*sin(2.d0*pi*u2)*sqrt(dt/3.d0)
     end if
 
-    call MPI_Bcast(r1,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
-    call MPI_Bcast(r2,lf,MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    call MPI_Bcast(r1,size(r1),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    call MPI_Bcast(r2,size(r2),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
     
     call q%copy_values(f0)
     
