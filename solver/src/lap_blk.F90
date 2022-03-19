@@ -843,7 +843,8 @@ contains
     type(dinfo), allocatable, dimension(:), intent(in) :: dw
     logical, intent(in) :: is_allocated
     complex(double_p), allocatable, dimension(:,:), intent(inout) :: w
-    complex(double_p) :: im,wh
+    complex(double_p) :: im
+    real(double_p) :: wh
     integer :: p,q,i,j,jg,l
     
     if (.not.is_allocated) then

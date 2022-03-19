@@ -109,13 +109,12 @@ contains
   function hturbf_gen(m,l,dlf,lf) result(f)
     integer, intent(in) :: m,l,dlf,lf
     real(double_p) :: a,b
-    complex(double_p) :: f
+    real(double_p) :: f
     
     a = (l-lf)*(l-lf)
     b = 0.5d0*dlf*dlf/log(10.d0)
     
-    f%re=exp(-a/b)
-    f%im=0.d0
+    f=exp(-a/b)
 
   end function
 !========================================================================================!
