@@ -348,10 +348,10 @@ contains
     
     if (IS_MASTER) then
       call random_number(r)
-      r=r*2.d0*pi
     end if
-
     call MPI_Bcast(r,size(r),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    
+    r=r*2.d0*pi
     
     call q%copy_values(f0)
     
@@ -423,13 +423,13 @@ contains
     if (IS_MASTER) then
       call random_number(u1)
       call random_number(u2)
-      r1=sqrt(-2.d0*log(u1))*cos(2.d0*pi*u2)*sqrt(dt/3.d0)
-      r2=sqrt(-2.d0*log(u1))*sin(2.d0*pi*u2)*sqrt(dt/3.d0)
     end if
 
     call MPI_Bcast(u1,size(u1),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
-    call MPI_Bcast(r1,size(r1),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
-    call MPI_Bcast(r2,size(r2),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    call MPI_Bcast(u2,size(u2),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
+    
+    r1=sqrt(-2.d0*log(u1))*cos(2.d0*pi*u2)*sqrt(dt/3.d0)
+    r2=sqrt(-2.d0*log(u1))*sin(2.d0*pi*u2)*sqrt(dt/3.d0)
     
     call q%copy_values(f0)
     
