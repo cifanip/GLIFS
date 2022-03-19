@@ -324,7 +324,8 @@ contains
       
       lfi = lf-dlf+i-1
       
-      call update_hturb_forcing_rphase(f,q,f0(i),lfi,dlf,dt)
+      !call update_hturb_forcing_rphase(f,q,f0(i),lfi,dlf,dt)
+      call update_hturb_forcing_dW(f,q,f0(i),lfi,dlf,dt)
       
     end do
     
@@ -428,8 +429,8 @@ contains
     call MPI_Bcast(u1,size(u1),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
     call MPI_Bcast(u2,size(u2),MPI_DOUBLE_PRECISION,0,MPI_COMM_WORLD,ierror)
     
-    r1=sqrt(-2.d0*log(u1))*cos(2.d0*pi*u2)*sqrt(dt/3.d0)
-    r2=sqrt(-2.d0*log(u1))*sin(2.d0*pi*u2)*sqrt(dt/3.d0)
+    r1=sqrt(-2.d0*log(u1))*cos(2.d0*pi*u2)*sqrt(dt)
+    r2=sqrt(-2.d0*log(u1))*sin(2.d0*pi*u2)*sqrt(dt)
     
     call q%copy_values(f0)
     
@@ -452,13 +453,9 @@ contains
             exit
           end if
           
-          !case m==0 to be fixed later (update_hturb_forcing_dW used instead)
+          !case m==0
           if (m==0) then
-            if (u1(m)>=0.5d0) then
-              aux%re = 1.d0
-            else
-              aux%re = -1.d0
-            end if
+            aux%re = sqrt(2.d0)*r1(m)
             aux%im = 0.d0
           else
             aux%re = r1(m)
