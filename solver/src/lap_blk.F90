@@ -344,7 +344,7 @@ contains
     complex(double_p) :: aux
     
     n=f%n
-    call allocate_array(r,1,lf)
+    call allocate_array(r,0,lf)
     
     if (IS_MASTER) then
       call random_number(r)
@@ -415,10 +415,10 @@ contains
     complex(double_p) :: aux
     
     n=f%n
-    call allocate_array(r1,1,lf)
-    call allocate_array(r2,1,lf)
-    call allocate_array(u1,1,lf)
-    call allocate_array(u2,1,lf)
+    call allocate_array(r1,0,lf)
+    call allocate_array(r2,0,lf)
+    call allocate_array(u1,0,lf)
+    call allocate_array(u2,0,lf)
     
     if (IS_MASTER) then
       call random_number(u1)
@@ -436,7 +436,7 @@ contains
     ncol=q%ncol
     
     !$OMP PARALLEL DO DEFAULT(none) &
-    !$OMP SHARED(n,q,r1,r2,gcs,ncol,lf,dt) &
+    !$OMP SHARED(n,q,u1,r1,r2,gcs,ncol,lf,dt) &
     !$OMP PRIVATE(m,row,j,aux)
     do m=0,lf
       

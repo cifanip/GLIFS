@@ -177,7 +177,8 @@ contains
       end if
 
       if (this%flow==H_TURB) then
-        call this%lap%compute_ic(this%w,SPH_IC_HTURB)
+        !call this%lap%compute_ic(this%w,SPH_IC_HTURB)
+        this%w%m=0.d0
       end if
 
       if (IS_MASTER) then
