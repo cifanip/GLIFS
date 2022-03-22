@@ -23,6 +23,8 @@ PROGRAM main
       call qturb%solve_euler()
     case(H_TURB)
       call qturb%solve_hturb()
+    case(D_TURB)
+      call qturb%solve_dturb()
     case default
       call abort_run('Wrong flow solver')
   end select
