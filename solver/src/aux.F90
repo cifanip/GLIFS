@@ -82,7 +82,7 @@ contains
       return
     end if
     
-    w_ref = 1.d-2
+    w_ref = 1.d0
     w_mag = sqrt(2.d0*w_ref/(2.d0*l+1.d0))
     
     !randomize module
