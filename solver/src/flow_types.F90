@@ -4,5 +4,6 @@ module flow_types_mod
 
   integer, parameter :: EULER  = 0
   integer, parameter :: H_TURB = 1
+  integer, parameter :: D_TURB = 2
   
 end module flow_types_mod

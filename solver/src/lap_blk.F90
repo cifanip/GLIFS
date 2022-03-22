@@ -48,7 +48,7 @@ module lap_blk_mod
     
     type(tdiags), allocatable, dimension(:) :: tds
     
-    type(cdmatrix) :: q
+    type(cdmatrix) :: q,aux
     
     contains
 
@@ -58,6 +58,7 @@ module lap_blk_mod
     procedure, public :: apply
     procedure, public :: apply_inv
     procedure, public :: apply_hturb
+    procedure, public :: apply_dturb
     procedure, public :: compute_ic
     procedure, public :: compute_sph_coeff
     procedure, public :: init_hturb_forcing
@@ -79,6 +80,7 @@ module lap_blk_mod
              apply,&
              apply_inv,&
              apply_hturb,&
+             apply_dturb,&
              compute_sph_coeff,&
              init_diags,&
              diags_to_buffer,&
@@ -155,6 +157,10 @@ contains
     call this%init_diags()
     
     call this%init_block_systems(flow)
+    
+    if (flow==D_TURB) then
+      this%aux = w
+    end if
 
   end subroutine
 !========================================================================================!
@@ -218,6 +224,66 @@ contains
 
     if (IS_MASTER) then
       write(*,'(A,'//output_format_(2:9)//')') '    APPLY H_TURB CPU TIME: ', te-ts
+    end if
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine apply_dturb(this,w,dt,nu,alpha,theta)
+    class(lap_blk), intent(inout) :: this
+    type(cdmatrix), intent(inout) :: w
+    real(double_p) :: dt,nu,alpha,theta,r,s,ts,te
+    integer :: i,j,k,n,n_diags,nrow,ncol
+    
+    ts = MPI_Wtime()
+    
+    n=this%n
+    n_diags=size(this%d_midx)
+    
+    call this%aux%copy_values(w)
+    call this%apply(w)
+    
+    nrow=w%nrow
+    ncol=w%ncol
+    
+    r=theta*dt*nu
+    s=theta*dt*alpha
+
+    !$OMP PARALLEL DO DEFAULT(none) &
+    !$OMP SHARED(nrow,ncol,dt,r,s,w,this) &
+    !$OMP PRIVATE(i,j)
+    do j=1,ncol
+      do i=1,nrow
+        w%m(i,j)=r*w%m(i,j) + (1.d0-s)*this%aux%m(i,j)
+      end do
+    end do
+    !$OMP END PARALLEL DO
+    
+    call w%cyclic_to_column(this%q)
+    call this%diags_to_buffer()
+    
+    !$OMP PARALLEL DO DEFAULT(none) &
+    !$OMP SHARED(n_diags,n,this) &
+    !$OMP PRIVATE(i,k)
+    do i=1,n_diags
+    
+      k=n-this%d_midx(i)
+      this%tds(i)%rhs=this%d_buff(i,1:k)
+      call solve_inv_lap(this%tds(i)%dn,this%tds(i)%en,this%tds(i)%rhs)
+      this%d_buff(i,1:k)=this%tds(i)%rhs
+    
+    end do
+    !$OMP END PARALLEL DO
+    
+    call this%buffer_to_diags()
+    call this%q%column_to_cyclic(w)
+    call w%make_skewh()
+
+    te = MPI_Wtime() 
+
+    if (IS_MASTER) then
+      write(*,'(A,'//output_format_(2:9)//')') '    APPLY D_TURB CPU TIME: ', te-ts
     end if
 
   end subroutine
@@ -895,7 +961,7 @@ contains
     type(par_file) :: pfile
     real(double_p) :: dt,nu,alpha,theta
     
-    if (flow==H_TURB) then
+    if ((flow==H_TURB).OR.(flow==D_TURB)) then
       call pfile%ctor('input_parameters','specs')
       call pfile%read_parameter(dt,'dt')
       call pfile%read_parameter(nu,'nu')
@@ -934,7 +1000,7 @@ contains
         call store_factorization(this%tds(i)%d,this%tds(i)%e)
       end if
       
-      if (flow==H_TURB) then
+      if ((flow==H_TURB).OR.(flow==D_TURB)) then
         !init Laplacian
         call compute_tmat(n,m,this%tds(i)%dl,this%tds(i)%el)
         this%tds(i)%dl=-this%tds(i)%dl

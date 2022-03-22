@@ -54,6 +54,7 @@ module solver_mod
     procedure, public :: ctor
     procedure, public :: solve_euler
     procedure, public :: solve_hturb
+    procedure, public :: solve_dturb
     procedure :: isomp
     procedure :: isomp_fpiter
     procedure :: isomp_expl
@@ -64,6 +65,7 @@ module solver_mod
              ctor,&
              solve_euler,&
              solve_hturb,&
+             solve_dturb,&
              isomp_fpiter,&
              isomp_expl,&
              isomp,&
@@ -108,7 +110,7 @@ contains
     call set_blas_sigle_thread()
     
     !init random generator
-    call random_seed()
+    !call random_seed()
     
     call this%mpic%ctor()
     call this%w%ctor(this%mpic,BLOCK_CYCLIC,'w',read_pgrid=.TRUE.)
@@ -139,6 +141,12 @@ contains
       this%dlf=2
     end if
     
+    if (this%flow==D_TURB) then
+      call pfile%read_parameter(this%nu,'nu')
+      call pfile%read_parameter(this%alpha,'alpha')
+      call pfile%read_parameter(this%theta,'theta')
+    end if
+    
     this%fields_dir = 'fields'
 
     call this%lap%ctor(this%mpic,this%w,this%flow)
@@ -151,6 +159,8 @@ contains
     this%psi_wth    = this%w
     this%psi_wt_psi = this%w
     this%delta_w    = this%w
+    
+    call this%psi%rename('psi')
 
     if (this%flow==H_TURB) then
       this%f  = this%w
@@ -161,6 +171,7 @@ contains
       end if 
       call this%lap%init_hturb_forcing(this%fmag,this%lf,this%dlf,this%f0)
     end if
+
     
     !init vorticity
     if (this%w%is_stored(this%run_time%output_dir,this%fields_dir)) then
@@ -179,6 +190,10 @@ contains
       if (this%flow==H_TURB) then
         !call this%lap%compute_ic(this%w,SPH_IC_HTURB)
         this%w%m=0.d0
+      end if
+      
+      if (this%flow==D_TURB) then
+        call this%lap%compute_ic(this%w,SPH_IC_HTURB)
       end if
 
       if (IS_MASTER) then
@@ -224,9 +239,73 @@ contains
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)
+        
+        !write vorticity
         call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write stream-function
+        call this%psi%copy_values(this%w)
+        call this%lap%apply_inv(this%psi)
+        call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write sph coefficients of vorticity
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
+        
+        !write sph coefficients of forcing
         call this%lap%compute_sph_coeff(this%f,this%run_time%output_dir,this%fields_dir)
+      end if
+      
+      l2W = this%w%l2_norm()
+      if (IS_MASTER) then
+        write(*,'(A,'//double_format_(2:10)//')') '    l2(W): ', l2W
+      end if 
+      
+      te = MPI_Wtime()
+    
+      call info_run_cpu_time(ts,te)
+
+    end do
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine solve_dturb(this)
+    class(solver), intent(inout) :: this
+    real(double_p) :: ts,te,l2W
+
+    do while (this%run_time%loop())
+
+      ts = MPI_Wtime()
+      
+      call this%lap%apply_dturb(this%w,&
+                                0.5d0*this%run_time%dt,&
+                                this%nu,&
+                                this%alpha,&
+                                this%theta)
+
+     call this%isomp()
+
+     call this%lap%apply_dturb(this%w,&
+                               0.5d0*this%run_time%dt,&
+                               this%nu,&
+                               this%alpha,&
+                               this%theta)
+                
+       
+      if (this%run_time%output()) then
+        call this%run_time%write_out(this%fields_dir)
+        
+        !write vorticity
+        call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write stream-function
+        call this%psi%copy_values(this%w)
+        call this%lap%apply_inv(this%psi)
+        call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write sph coefficients of vorticity
+        call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
       end if
       
       l2W = this%w%l2_norm()
@@ -257,7 +336,16 @@ contains
        
       if (this%run_time%output()) then
         call this%run_time%write_out(this%fields_dir)
+        
+        !write vorticity
         call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write stream-function
+        call this%psi%copy_values(this%w)
+        call this%lap%apply_inv(this%psi)
+        call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write sph coefficients of vorticity
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
       end if
       
