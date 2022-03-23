@@ -136,6 +136,7 @@ contains
     deallocate(this%tds)
 
     call this%q%delete()
+    call this%aux%delete(delete_mpi=.FALSE.)
     
   end subroutine
 !========================================================================================!
@@ -161,9 +162,7 @@ contains
     
     call this%init_block_systems(flow)
     
-    if (flow==D_TURB) then
-      this%aux = w
-    end if
+    this%aux = w
 
   end subroutine
 !========================================================================================!
@@ -556,11 +555,13 @@ contains
     character(len=*), intent(in) :: fdir
     type(cdmatrix), intent(in) :: psi
     type(cdmatrix), intent(inout) :: Tu,u
+    real(double_p) :: r
     integer :: l,m
     
-    !ux
     l=1
     m=1
+    
+    r=1.d0/sqrt(2.d0)
     
     call this%q%set_to_zero()
     call this%v%ctor(this%mpic,BLOCK_CYCLIC,this%n-m,1,1)
@@ -568,22 +569,32 @@ contains
                       this%v%is_allocated,this%v%desc,this%v%m)
     call this%add_q_component(this%q,l,l,SPH_TCOMP)
     call this%v%delete()
+    
+    !iT_{1,1}
     call this%q%column_to_cyclic(Tu)
     
-    call u%multiply(Tu,psi)
-    call u%ptrm%multiply(psi,Tu)
-    u%m = u%m - u%ptrm%m
+    !iT_{1,-1}
+    call Tu%ptrm%hconj(Tu)
     
-    call u%rename('ux')
+    !uy
+    this%aux%m = r*(Tu%ptrm%m - Tu%m)
+    call u%multiply(this%aux,psi)
+    call u%ptrm%multiply(psi,this%aux)
+    u%m = (u%m - u%ptrm%m)*(u%n**(1.5d0))/sqrt(16.d0*pi)
+    
+    call u%rename('uy')
     call u%write_to_disk(out_dir,fdir)
     call this%compute_sph_coeff(u,out_dir,fdir)
-
-    !uy
     
-    call Tu%ptrm%hconj(Tu)
-    call u%multiply(Tu%ptrm,psi)
-    call u%ptrm%multiply(psi,Tu%ptrm)
-    u%m = u%m - u%ptrm%m
+    !ux
+    Tu%m%re=Tu%m%im
+    Tu%m%im=0.d0
+    Tu%ptrm%m%re=Tu%ptrm%m%im
+    Tu%ptrm%m%im=0.d0
+    this%aux%m = r*(Tu%ptrm%m + Tu%m)
+    call u%multiply(this%aux,psi)
+    call u%ptrm%multiply(psi,this%aux)
+    u%m = (u%m - u%ptrm%m)*(u%n**(1.5d0))/sqrt(16.d0*pi)
     
     call u%rename('uy')
     call u%write_to_disk(out_dir,fdir)
