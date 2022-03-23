@@ -596,7 +596,7 @@ contains
     call u%ptrm%multiply(psi,this%aux)
     u%m = (u%m - u%ptrm%m)*(u%n**(1.5d0))/sqrt(16.d0*pi)
     
-    call u%rename('uy')
+    call u%rename('ux')
     call u%write_to_disk(out_dir,fdir)
     call this%compute_sph_coeff(u,out_dir,fdir)
     
