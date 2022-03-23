@@ -12,6 +12,7 @@ module lap_blk_mod
   integer, parameter :: SPH_IC_EULER = 1
   integer, parameter :: SPH_IC_HTURB = 2
   integer, parameter :: SPH_F        = 3
+  integer, parameter :: SPH_TCOMP    = 4
 
   !auxiliary type (diagonal points info)
   type :: dinfo
@@ -61,6 +62,7 @@ module lap_blk_mod
     procedure, public :: apply_dturb
     procedure, public :: compute_ic
     procedure, public :: compute_sph_coeff
+    procedure, public :: write_out_vel
     procedure, public :: init_hturb_forcing
     procedure :: add_q_component
     procedure :: compute_vort_component
@@ -82,6 +84,7 @@ module lap_blk_mod
              apply_hturb,&
              apply_dturb,&
              compute_sph_coeff,&
+             write_out_vel,&
              init_diags,&
              diags_to_buffer,&
              buffer_to_diags,&
@@ -547,6 +550,69 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+  subroutine write_out_vel(this,psi,out_dir,fdir,Tu,u)
+    class(lap_blk), intent(inout) :: this
+    integer, intent(in) :: out_dir
+    character(len=*), intent(in) :: fdir
+    type(cdmatrix), intent(in) :: psi
+    type(cdmatrix), intent(inout) :: Tu,u
+    integer :: l,m
+    
+    !ux
+    l=1
+    m=1
+    
+    call this%q%set_to_zero()
+    call this%v%ctor(this%mpic,BLOCK_CYCLIC,this%n-m,1,1)
+    call compute_eigv(this%n,this%v%n,this%v%npcol,this%v%nrow,this%v%ncol,&
+                      this%v%is_allocated,this%v%desc,this%v%m)
+    call this%add_q_component(this%q,l,l,SPH_TCOMP)
+    call this%v%delete()
+    call this%q%column_to_cyclic(Tu)
+    
+    call u%multiply(Tu,psi)
+    call u%ptrm%multiply(psi,Tu)
+    u%m = u%m - u%ptrm%m
+    
+    call u%rename('ux')
+    call u%write_to_disk(out_dir,fdir)
+    call this%compute_sph_coeff(u,out_dir,fdir)
+
+    !uy
+    
+    call Tu%ptrm%hconj(Tu)
+    call u%multiply(Tu%ptrm,psi)
+    call u%ptrm%multiply(psi,Tu%ptrm)
+    u%m = u%m - u%ptrm%m
+    
+    call u%rename('uy')
+    call u%write_to_disk(out_dir,fdir)
+    call this%compute_sph_coeff(u,out_dir,fdir)
+    
+    !uz
+    l=1
+    m=0
+    
+    call this%q%set_to_zero()
+    call this%v%ctor(this%mpic,BLOCK_CYCLIC,this%n-m,1,1)
+    call compute_eigv(this%n,this%v%n,this%v%npcol,this%v%nrow,this%v%ncol,&
+                      this%v%is_allocated,this%v%desc,this%v%m)
+    call this%add_q_component(this%q,l,l,SPH_TCOMP)
+    call this%v%delete()
+    call this%q%column_to_cyclic(Tu)
+    
+    call u%multiply(Tu,psi)
+    call u%ptrm%multiply(psi,Tu)
+    u%m = u%m - u%ptrm%m
+    
+    call u%rename('uz')
+    call u%write_to_disk(out_dir,fdir)
+    call this%compute_sph_coeff(u,out_dir,fdir)
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
   subroutine compute_ic(this,w,qbasis_op)
     class(lap_blk), intent(inout) :: this
     type(cdmatrix), intent(inout) :: w
@@ -756,7 +822,7 @@ contains
       call MPI_BCAST(buff,size(buff),MPI_DOUBLE_PRECISION,i,MPI_COMM_WORLD,ierror)
       
       select case(qbasis_op)
-        case(SPH_IC_TEST,SPH_IC_EULER,SPH_IC_HTURB)
+        case(SPH_IC_TEST,SPH_IC_EULER,SPH_IC_HTURB,SPH_TCOMP)
           call assemble_ic(m,l_ref_min,l_ref_max,info(4),i,info(3),buff,&
                            this%dw,w%is_allocated,qbasis_op,w%m)
         case(SPH_F)
@@ -883,6 +949,8 @@ contains
             wh=ic_gen_euler(m,l,l_min,l_max)
           case(SPH_IC_HTURB)
             wh=ic_gen_hturb(m,l,l_min,l_max)
+          case(SPH_TCOMP)
+            wh=(1.d0,0.d0)
           case default
         end select
 

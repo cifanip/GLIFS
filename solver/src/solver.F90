@@ -47,6 +47,9 @@ module solver_mod
     
     !theta-method hturb
     real(double_p) :: theta
+    
+    !basis for comp. velocity (post-proc)
+    type(cdmatrix) :: u,Tu
 
     contains
       
@@ -97,6 +100,9 @@ contains
       call this%f%delete(delete_mpi=.FALSE.)
       deallocate(this%f0)      
     end if
+    
+    call this%u%delete(delete_mpi=.FALSE.)
+    call this%Tu%delete(delete_mpi=.FALSE.)
     
   end subroutine
 !========================================================================================!
@@ -161,9 +167,13 @@ contains
     this%delta_w    = this%w
     
     call this%psi%rename('psi')
+    
+    !allocate matrices for velocity
+    this%u  = this%w
+    this%Tu = this%w
 
     if (this%flow==H_TURB) then
-      this%f  = this%w
+      this%f = this%w
       call this%f%rename('f')
       allocate(this%f0(2*this%dlf+1),stat=err)
       if (err /= 0) then
@@ -248,6 +258,10 @@ contains
         call this%lap%apply_inv(this%psi)
         call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
         
+        !write velocity
+        call this%lap%write_out_vel(this%psi,this%run_time%output_dir,&
+                                    this%fields_dir,this%Tu,this%u)
+        
         !write sph coefficients of vorticity
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
         
@@ -303,6 +317,10 @@ contains
         call this%psi%copy_values(this%w)
         call this%lap%apply_inv(this%psi)
         call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
+
+        !write velocity
+        ! -- call this%lap%write_out_vel(this%psi,this%run_time%output_dir,&
+        !                                this%fields_dir,this%Tu,this%u)
         
         !write sph coefficients of vorticity
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
@@ -344,6 +362,10 @@ contains
         call this%psi%copy_values(this%w)
         call this%lap%apply_inv(this%psi)
         call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write velocity
+        ! -- call this%lap%write_out_vel(this%psi,this%run_time%output_dir,&
+        !                                this%fields_dir,this%Tu,this%u)
         
         !write sph coefficients of vorticity
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
