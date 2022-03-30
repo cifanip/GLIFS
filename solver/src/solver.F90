@@ -583,12 +583,12 @@ contains
   subroutine clean_up(this)
     class(solver), intent(inout) :: this
     
-    call this%wt0%ptrm%delete()
-    call this%wt%ptrm%delete()
-    call this%psi_wt%ptrm%delete()
-    call this%psi_wth%ptrm%delete()
-    call this%psi_wt_psi%ptrm%delete()
-    call this%delta_w%ptrm%delete()  
+    call this%wt0%ptrm%delete(delete_mpi=.FALSE.)
+    call this%wt%ptrm%delete(delete_mpi=.FALSE.)
+    call this%psi_wt%ptrm%delete(delete_mpi=.FALSE.)
+    call this%psi_wth%ptrm%delete(delete_mpi=.FALSE.)
+    call this%psi_wt_psi%ptrm%delete(delete_mpi=.FALSE.)
+    call this%delta_w%ptrm%delete(delete_mpi=.FALSE.)  
 
   end subroutine
 !========================================================================================!
