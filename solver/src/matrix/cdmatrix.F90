@@ -264,6 +264,10 @@ contains
     end if
 
     call reset_uppert(this%gidx,this%m)
+    
+    if (.not.associated(this%ptrm)) then
+      call abort_run('Pointer matrix not associated found in make_skewh')
+    end if
 
     alpha=(-1.d0,0.0)
     beta=(1.d0,0.d0)
@@ -346,6 +350,10 @@ contains
     
     alpha=(0.d0,-1.d0)
     beta=(0.d0,0.d0)
+    
+    if (.not.associated(a%ptrm)) then
+      call abort_run('Pointer matrix not associated found in multiply_h')
+    end if
     
     a%ptrm%m=a%m
     s = (0.d0,1.d0)
