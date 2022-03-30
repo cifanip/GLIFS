@@ -61,6 +61,7 @@ module solver_mod
     procedure :: isomp
     procedure :: isomp_fpiter
     procedure :: isomp_expl
+    procedure :: clean_up
 
   end type
   
@@ -72,6 +73,7 @@ module solver_mod
              isomp_fpiter,&
              isomp_expl,&
              isomp,&
+             clean_up,&
              info_run_cpu_time
              
   !outside of type
@@ -165,6 +167,9 @@ contains
     this%psi_wth    = this%w
     this%psi_wt_psi = this%w
     this%delta_w    = this%w
+    
+    !clean-up some memory
+    call this%clean_up()
     
     call this%psi%rename('psi')
     
@@ -570,6 +575,20 @@ contains
       end do
     end do
     !$OMP END PARALLEL DO
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine clean_up(this)
+    class(solver), intent(inout) :: this
+    
+    call this%wt0%ptrm%delete()
+    call this%wt%ptrm%delete()
+    call this%psi_wt%ptrm%delete()
+    call this%psi_wth%ptrm%delete()
+    call this%psi_wt_psi%ptrm%delete()
+    call this%delta_w%ptrm%delete()  
 
   end subroutine
 !========================================================================================!
