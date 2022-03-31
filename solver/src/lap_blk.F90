@@ -350,12 +350,12 @@ contains
     
       s=n-this%d_midx(i)
       
-      call reallocate_array(aux_v,0,s+1)
+      call allocate_array(aux_v,0,s+1)
       aux_v(0)=(0.d0,0.d0)
       aux_v(s+1)=(0.d0,0.d0)
       aux_v(1:s)=this%d_buff(i,1:s)
 
-      call reallocate_array(aux_e,0,s)
+      call allocate_array(aux_e,0,s)
       aux_e(0)=0.d0
       aux_e(1:s)=this%tds(i)%el
 
@@ -365,6 +365,9 @@ contains
       end do
       
       this%d_buff(i,1:s)=this%tds(i)%rhs
+      
+      call deallocate_array(aux_v)
+      call deallocate_array(aux_e)
     
     end do
     !$OMP END PARALLEL DO
