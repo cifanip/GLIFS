@@ -1051,8 +1051,8 @@ contains
       call pfile%read_parameter(theta,'theta')
       !symmetric strang splitting
       dt=0.5d0*dt
-      !account for term \nu \omega
-      alpha = alpha - nu
+      !account for term 2 \nu \omega
+      alpha = alpha - 2.d0*nu
     end if
     
     if (.not.this%q%is_allocated) then
@@ -1156,6 +1156,8 @@ contains
     
     n=size(d)
     call allocate_array(aux,1,n)
+    
+    rhs=rhs-sum(rhs)/n
 
     r=1.d0/d(1)
     rhs(1)=r*rhs(1)
