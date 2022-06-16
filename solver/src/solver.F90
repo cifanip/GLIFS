@@ -140,8 +140,8 @@ contains
       call pfile%read_parameter(this%fmag,'fmag')
       call pfile%read_parameter(this%lf,'lf')
       call pfile%read_parameter(this%theta,'theta')
-      !account for term \nu \omega
-      this%alpha = this%alpha - this%nu
+      !account for term 2 \nu \omega
+      this%alpha = this%alpha - 2.d0*this%nu
       if (this%lf>this%w%n-1) then
         call abort_run('lf > N-1')
       end if
@@ -153,6 +153,8 @@ contains
       call pfile%read_parameter(this%nu,'nu')
       call pfile%read_parameter(this%alpha,'alpha')
       call pfile%read_parameter(this%theta,'theta')
+      !account for term 2 \nu \omega
+      this%alpha = this%alpha - 2.d0*this%nu
     end if
     
     this%fields_dir = 'fields'
