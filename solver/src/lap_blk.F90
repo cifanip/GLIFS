@@ -22,14 +22,31 @@ module lap_blk_mod
 
   !auxiliary type (tridiagonal systems)
   type :: tdiags
-    !used for apply inverse Laplacian
+  
+    !-- used for apply inverse Laplacian/Helmholtz
+  
+    !diagonal element Laplacian
     real(double_p), allocatable, dimension(:) :: d
+    
+    !diagonal element Helmholtz
+    complex(double_p), allocatable, dimension(:) :: dh
+    
+    !off diagonals and rhs
     complex(double_p), allocatable, dimension(:) :: e,rhs
+    
+    !additional Lapack storage needed for Helmholtz operator
+    complex(double_p), allocatable, dimension(:) :: u,du2
+    integer, allocatable, dimension(:) :: ipiv
+    
+    !--
+
     !used for apply Laplacian
     real(double_p), allocatable, dimension(:) :: dl,el
+    
     !used for viscosity and damping
     real(double_p), allocatable, dimension(:) :: dn
     complex(double_p), allocatable, dimension(:) :: en
+    
   end type
 
   type, public :: lap_blk
@@ -58,12 +75,14 @@ module lap_blk_mod
     
     procedure, public :: apply
     procedure, public :: apply_inv
+    procedure, public :: apply_inv_helmholtz
     procedure, public :: apply_hturb
     procedure, public :: apply_dturb
     procedure, public :: compute_ic
     procedure, public :: compute_sph_coeff
     procedure, public :: write_out_vel
     procedure, public :: init_hturb_forcing
+    procedure, public :: init_coriolis_matrix
     procedure :: add_q_component
     procedure :: compute_vort_component
     procedure :: init_dinfo
@@ -81,6 +100,7 @@ module lap_blk_mod
              init_dinfo,&
              apply,&
              apply_inv,&
+             apply_inv_helmholtz,&
              apply_hturb,&
              apply_dturb,&
              compute_sph_coeff,&
@@ -88,7 +108,8 @@ module lap_blk_mod
              init_diags,&
              diags_to_buffer,&
              buffer_to_diags,&
-             init_block_systems
+             init_block_systems,&
+             init_coriolis_matrix
   
   !outside of type
   private :: assemble_ic,&
@@ -97,9 +118,11 @@ module lap_blk_mod
              adjust_basis_sign,&
              compute_vort_component,&
              frobenius_prod,&
-             store_factorization,&
+             store_factorization_lap,&
+             store_factorization_hel,&
              solve_inv_lap,&
              solve_inv_lap_m0,&
+             solve_inv_hel,&
              update_hturb_forcing_rphase,&
              update_hturb_forcing_dW
 
@@ -301,7 +324,7 @@ contains
     n=this%n
     n_diags=size(this%d_midx)
 
-    call w%cyclic_to_column(this%q)
+    call w%cyclic_to_column(this%q)    
     call this%diags_to_buffer()
     
     !$OMP PARALLEL DO DEFAULT(none) &
@@ -317,6 +340,46 @@ contains
       else
         call solve_inv_lap(this%tds(i)%d,this%tds(i)%e,this%tds(i)%rhs)
       end if
+      this%d_buff(i,1:s)=this%tds(i)%rhs
+    
+    end do
+    !$OMP END PARALLEL DO
+    
+    call this%buffer_to_diags()
+    call this%q%column_to_cyclic(w)
+    call w%make_skewh()  
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine apply_inv_helmholtz(this,w)
+    class(lap_blk), intent(inout) :: this
+    type(cdmatrix), intent(inout) :: w
+    complex(double_p), allocatable, dimension(:) :: rhs
+    integer :: i,n,m,s,n_diags
+    
+    n=this%n
+    n_diags=size(this%d_midx)
+
+    call w%cyclic_to_column(this%q)    
+    call this%diags_to_buffer()
+    
+    !$OMP PARALLEL DO DEFAULT(none) &
+    !$OMP SHARED(n_diags,n,this) &
+    !$OMP PRIVATE(i,m,s)
+    do i=1,n_diags
+    
+      m=this%d_midx(i)
+      s=n-m
+      this%tds(i)%rhs=this%d_buff(i,1:s)
+      
+      call solve_inv_hel(this%tds(i)%dh,&
+                         this%tds(i)%e,&
+                         this%tds(i)%u,&
+                         this%tds(i)%du2,&
+                         this%tds(i)%ipiv,&
+                         this%tds(i)%rhs)
       this%d_buff(i,1:s)=this%tds(i)%rhs
     
     end do
@@ -790,6 +853,31 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+  subroutine init_coriolis_matrix(this,cor_par,f)
+    class(lap_blk), intent(inout) :: this
+    real(double_p), intent(in) :: cor_par
+    type(cdmatrix), intent(inout) :: f
+    integer :: l,m
+    
+    l=1
+    m=0
+    
+    call this%q%set_to_zero()
+    call this%v%ctor(this%mpic,BLOCK_CYCLIC,this%n-m,1,1)
+    call compute_eigv(this%n,this%v%n,this%v%npcol,this%v%nrow,this%v%ncol,&
+                      this%v%is_allocated,this%v%desc,this%v%m)
+    call this%add_q_component(this%q,l,l,SPH_TCOMP)
+    call this%v%delete()
+    
+    !iT_{1,0}
+    call this%q%column_to_cyclic(f)
+    
+    f%m = cor_par*f%m
+    
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
   subroutine add_q_component(this,w,l_ref_min,l_ref_max,qbasis_op,dl_ref)
     class(lap_blk), intent(in) :: this
     type(cdmatrix), intent(inout) :: w
@@ -1041,7 +1129,7 @@ contains
     real(double_p), allocatable, dimension(:) :: d_aux,e_aux
     integer :: n,m,i,j,err
     type(par_file) :: pfile
-    real(double_p) :: dt,nu,alpha,theta
+    real(double_p) :: dt,nu,alpha,theta,k_hel
     
     if ((flow==H_TURB).OR.(flow==D_TURB)) then
       call pfile%ctor('input_parameters','specs')
@@ -1051,8 +1139,13 @@ contains
       call pfile%read_parameter(theta,'theta')
       !symmetric strang splitting
       dt=0.5d0*dt
-      !account for term 2 \nu \omega
+      !account for term \nu \omega
       alpha = alpha - 2.d0*nu
+    end if
+    
+    if (flow==QG_FLOW) then
+      call pfile%ctor('input_parameters','specs')
+      call pfile%read_parameter(k_hel,'k_hel')
     end if
     
     if (.not.this%q%is_allocated) then
@@ -1078,8 +1171,24 @@ contains
         this%tds(i)%e(j)%re=e_aux(j)
         this%tds(i)%e(j)%im=0.d0
       end do
-      if (m>0) then
-        call store_factorization(this%tds(i)%d,this%tds(i)%e)
+      
+      if (flow==QG_FLOW) then
+        call reallocate_array(this%tds(i)%dh,1,n-m)
+        call reallocate_array(this%tds(i)%u,1,n-m)
+        do j=1,n-m
+          this%tds(i)%dh(j)%re = this%tds(i)%d(j) - k_hel 
+          this%tds(i)%dh(j)%im = 0.d0
+        end do
+        this%tds(i)%u=this%tds(i)%e
+        call store_factorization_hel(this%tds(i)%dh,&
+                                     this%tds(i)%e,&
+                                     this%tds(i)%u,&
+                                     this%tds(i)%du2,&
+                                     this%tds(i)%ipiv)
+      else
+        if (m>0) then
+          call store_factorization_lap(this%tds(i)%d,this%tds(i)%e)
+        end if
       end if
       
       if ((flow==H_TURB).OR.(flow==D_TURB)) then
@@ -1100,7 +1209,7 @@ contains
         end do
         this%tds(i)%dn = -(1.d0-theta)*dt*nu*this%tds(i)%dn +1.d0 +&
                           (1.d0-theta)*dt*alpha
-        call store_factorization(this%tds(i)%dn,this%tds(i)%en)
+        call store_factorization_lap(this%tds(i)%dn,this%tds(i)%en)
       end if
       
     end do
@@ -1109,7 +1218,7 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine store_factorization(d,e)
+  subroutine store_factorization_lap(d,e)
     real(double_p), allocatable, dimension(:), intent(inout) :: d
     complex(double_p), allocatable, dimension(:), intent(inout) :: e
     integer :: n,info
@@ -1120,6 +1229,27 @@ contains
 
     if (info.ne.0) then
       call abort_run('zpttrf in lap_blk failed',info)
+    end if
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine store_factorization_hel(d,e,u,du2,ipiv)
+    complex(double_p), allocatable, dimension(:), intent(inout) :: d,e,u
+    complex(double_p), allocatable, dimension(:), intent(inout) :: du2
+    integer, allocatable, dimension(:), intent(inout) :: ipiv
+    integer :: n,info
+    
+    n=size(d)
+
+    call reallocate_array(du2,1,n-2)
+    call reallocate_array(ipiv,1,n)
+    
+    call zgttrf(n,e,d,u,du2,ipiv,info)
+
+    if (info.ne.0) then
+      call abort_run('zgttrf in lap_blk failed',info)
     end if
 
   end subroutine
@@ -1140,6 +1270,26 @@ contains
 
     if (info.ne.0) then
       call abort_run('zpttrs in lap_blk failed',info)
+    end if
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine solve_inv_hel(d,e,u,du2,ipiv,rhs)
+    complex(double_p), allocatable, dimension(:), intent(in) :: d,e,u,du2
+    integer, allocatable, dimension(:), intent(in) :: ipiv
+    complex(double_p), allocatable, dimension(:), intent(inout) :: rhs
+    integer :: n,ldb,nrhs,info
+    
+    n=size(d)
+    ldb=n
+    nrhs=1
+    
+    call zgttrs('N',n,nrhs,e,d,u,du2,ipiv,rhs,ldb,info)
+
+    if (info.ne.0) then
+      call abort_run('zgttrs in lap_blk failed',info)
     end if
 
   end subroutine
@@ -1169,7 +1319,7 @@ contains
       aux(i)=1.d0-w*r0*e(i-1)
       rhs(i)=r*rhs(i)-w*rhs(i-1)
     end do
-    rhs(n)=0.d0
+    rhs(n)=0.d0    
     do i=n-1,1,-1
       r=1.d0/d(i)
       rhs(i)=(rhs(i)-r*e(i)*rhs(i+1))/aux(i)

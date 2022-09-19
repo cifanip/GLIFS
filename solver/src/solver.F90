@@ -51,6 +51,10 @@ module solver_mod
     !basis for comp. velocity (post-proc)
     type(cdmatrix) :: u,Tu
 
+    !coriolis matrix
+    type(cdmatrix) :: f_cor
+    real(double_p) :: cor_par
+
     contains
       
     procedure, public :: delete
@@ -58,6 +62,7 @@ module solver_mod
     procedure, public :: solve_euler
     procedure, public :: solve_hturb
     procedure, public :: solve_dturb
+    procedure, public :: solve_qg_flow
     procedure :: isomp
     procedure :: isomp_fpiter
     procedure :: isomp_expl
@@ -70,6 +75,7 @@ module solver_mod
              solve_euler,&
              solve_hturb,&
              solve_dturb,&
+             solve_qg_flow,&
              isomp_fpiter,&
              isomp_expl,&
              isomp,&
@@ -101,6 +107,9 @@ contains
     if (this%flow==H_TURB) then
       call this%f%delete(delete_mpi=.FALSE.)
       deallocate(this%f0)      
+    end if
+    if (this%flow==QG_FLOW) then
+      call this%f_cor%delete(delete_mpi=.FALSE.)     
     end if
     
     call this%u%delete(delete_mpi=.FALSE.)
@@ -188,8 +197,13 @@ contains
       end if 
       call this%lap%init_hturb_forcing(this%fmag,this%lf,this%dlf,this%f0)
     end if
-
     
+    if (this%flow==QG_FLOW) then
+      this%f_cor = this%w
+      call pfile%read_parameter(this%cor_par,'cor_par')
+      call this%lap%init_coriolis_matrix(this%cor_par,this%f_cor)
+    end if
+
     !init vorticity
     if (this%w%is_stored(this%run_time%output_dir,this%fields_dir)) then
     
@@ -201,7 +215,8 @@ contains
     else
       
       if (this%flow==EULER) then
-        call this%lap%compute_ic(this%w,SPH_IC_EULER)     
+        call this%lap%compute_ic(this%w,SPH_IC_EULER)
+        !call this%lap%compute_ic(this%w,SPH_IC_TEST)     
       end if
 
       if (this%flow==H_TURB) then
@@ -211,6 +226,11 @@ contains
       
       if (this%flow==D_TURB) then
         call this%lap%compute_ic(this%w,SPH_IC_HTURB)
+      end if
+
+      if (this%flow==QG_FLOW) then
+        call this%lap%compute_ic(this%w,SPH_IC_EULER)  
+        !call this%lap%compute_ic(this%w,SPH_IC_TEST)
       end if
 
       if (IS_MASTER) then
@@ -348,6 +368,15 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+  subroutine solve_qg_flow(this)
+    class(solver), intent(inout) :: this
+    
+    call this%solve_euler()
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
   subroutine solve_euler(this)
     class(solver), intent(inout) :: this
     real(double_p) :: ts,te
@@ -395,7 +424,7 @@ contains
     
     ts = MPI_Wtime()
     
-    call this%isomp_fpiter(dt_opt)
+    call this%isomp_fpiter(dt_opt)    
     call this%isomp_expl(dt_opt)   
       
     te = MPI_Wtime() 
@@ -421,10 +450,22 @@ contains
     
     !scale commutator
     dt=dt*(this%w%n**(1.5d0))/sqrt(16.d0*pi)
+    
+    !set RHS stream-function problem
+    select case(this%flow)
+      case(QG_FLOW)
+        call this%psi%subtract(this%wt,this%f_cor)
+      case default
+        call this%psi%copy_values(this%wt)
+    end select
 
-    !apply inverse laplacian
-    call this%psi%copy_values(this%wt)
-    call this%lap%apply_inv(this%psi)
+    !apply inverse operator: laplacian/helmholtz
+    select case(this%flow)
+      case(QG_FLOW)
+        call this%lap%apply_inv_helmholtz(this%psi)
+      case default
+        call this%lap%apply_inv(this%psi)
+    end select
     
     !(\Delta^{-1} Wt)Wt
     call this%psi_wt%multiply(this%psi,this%wt)
@@ -477,9 +518,21 @@ contains
     
     do
     
-      !apply inverse laplacian
-      call this%psi%copy_values(this%wt0)
-      call this%lap%apply_inv(this%psi)
+      !set RHS stream-function problem
+      select case(this%flow)
+        case(QG_FLOW)
+          call this%psi%subtract(this%wt0,this%f_cor)
+        case default
+          call this%psi%copy_values(this%wt0)
+      end select
+
+      !apply inverse operator: laplacian/helmholtz
+      select case(this%flow)
+        case(QG_FLOW)
+          call this%lap%apply_inv_helmholtz(this%psi)
+        case default
+          call this%lap%apply_inv(this%psi)
+      end select
 
       !(\Delta^{-1} Wt)Wt
       call this%psi_wt%multiply(this%psi,this%wt0)
