@@ -1,2 +1,2 @@
-# QUAFF
-QUAntized Fluids in Fortran: parallel implementation of the quantized equations for the evolution of fluids on the sphere.
+# GLIFS
+Geometric Lie-Poisson Isospectral Flow Solver: parallel implementation of the Lie-Poisson equations for the evolution of fluids on the sphere.
