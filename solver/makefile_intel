@@ -36,9 +36,9 @@ OBJDIR_FLAG = -module $(OBJDIR)
 
 ##########################  compiler options
 #debug
-#FLAGS = -g -traceback -C $(MT_FLAG) $(OBJDIR_FLAG)
+FLAGS = -g -traceback -C $(MT_FLAG) $(OBJDIR_FLAG)
 #optimal
-FLAGS = -O3 -traceback $(MT_FLAG) $(OBJDIR_FLAG)
+#FLAGS = -O3 -traceback $(MT_FLAG) $(OBJDIR_FLAG)
 
 #--------------------------compile
 include makefile_source
