@@ -395,16 +395,30 @@ contains
         call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
         
         !write stream-function
-        call this%psi%copy_values(this%w)
-        call this%lap%apply_inv(this%psi)
+        select case(this%flow)
+          case(QG_FLOW)
+            call this%psi%subtract(this%w,this%f_cor)
+          case default
+            call this%psi%copy_values(this%w)
+        end select
+
+        !apply inverse operator: laplacian/helmholtz
+        select case(this%flow)
+          case(QG_FLOW)
+            call this%lap%apply_inv_helmholtz(this%psi)
+          case default
+            call this%lap%apply_inv(this%psi)
+        end select
+
         call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
         
         !write velocity
         ! -- call this%lap%write_out_vel(this%psi,this%run_time%output_dir,&
         !                                this%fields_dir,this%Tu,this%u)
         
-        !write sph coefficients of vorticity
+        !write sph coefficients of vorticity and stream-function
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
+        call this%lap%compute_sph_coeff(this%psi,this%run_time%output_dir,this%fields_dir)
       end if
       
       te = MPI_Wtime()
