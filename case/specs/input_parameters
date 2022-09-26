@@ -1,6 +1,6 @@
 flow 0
 
-N 513
+N 512
 nprow 1
 npcol 1
 
@@ -10,11 +10,8 @@ input_folder 0
 write_interval -1
 dtout 1.d-1
 
-l_cut 20
+l_min 1
+l_max 32
 
-tol 1.d-10
+tol 1.d-12
 max_iter 100
-
-nu 1.d-5
-alpha 1.5d-2
-lf 4
