@@ -63,6 +63,7 @@ module solver_mod
     procedure, public :: solve_hturb
     procedure, public :: solve_dturb
     procedure, public :: solve_qg_flow
+    procedure, public :: solve_qgturb
     procedure :: isomp
     procedure :: isomp_fpiter
     procedure :: isomp_expl
@@ -76,6 +77,7 @@ module solver_mod
              solve_hturb,&
              solve_dturb,&
              solve_qg_flow,&
+             solve_qgturb,&
              isomp_fpiter,&
              isomp_expl,&
              isomp,&
@@ -108,7 +110,7 @@ contains
       call this%f%delete(delete_mpi=.FALSE.)
       deallocate(this%f0)      
     end if
-    if (this%flow==QG_FLOW) then
+    if ((this%flow==QG_FLOW).OR.(this%flow==QG_TURB_FLOW)) then
       call this%f_cor%delete(delete_mpi=.FALSE.)     
     end if
     
@@ -143,7 +145,7 @@ contains
     call pfile%read_parameter(this%max_iter,'max_iter') 
     call pfile%read_parameter(this%flow,'flow') 
     
-    if (this%flow==H_TURB) then
+    if ((this%flow==H_TURB).OR.(this%flow==QG_TURB_FLOW)) then
       call pfile%read_parameter(this%nu,'nu')
       call pfile%read_parameter(this%alpha,'alpha')
       call pfile%read_parameter(this%fmag,'fmag')
@@ -188,7 +190,7 @@ contains
     this%u  = this%w
     this%Tu = this%w
 
-    if (this%flow==H_TURB) then
+    if ((this%flow==H_TURB).OR.(this%flow==QG_TURB_FLOW)) then
       this%f = this%w
       call this%f%rename('f')
       allocate(this%f0(2*this%dlf+1),stat=err)
@@ -198,7 +200,7 @@ contains
       call this%lap%init_hturb_forcing(this%fmag,this%lf,this%dlf,this%f0)
     end if
     
-    if (this%flow==QG_FLOW) then
+    if ((this%flow==QG_FLOW).OR.(this%flow==QG_TURB_FLOW)) then
       this%f_cor = this%w
       call pfile%read_parameter(this%cor_par,'cor_par')
       call this%lap%init_coriolis_matrix(this%cor_par,this%f_cor)
@@ -229,8 +231,13 @@ contains
       end if
 
       if (this%flow==QG_FLOW) then
-        call this%lap%compute_ic(this%w,SPH_IC_EULER)  
-        !call this%lap%compute_ic(this%w,SPH_IC_TEST)
+        call this%lap%compute_ic(this%w,SPH_IC_EULER)
+        this%w%m = this%w%m + this%f_cor%m
+      end if
+
+      if (this%flow==QG_TURB_FLOW) then
+        this%w%m=0.d0
+        this%w%m = this%w%m + this%f_cor%m
       end if
 
       if (IS_MASTER) then
@@ -368,6 +375,74 @@ contains
 !========================================================================================!
 
 !========================================================================================!
+  subroutine solve_qgturb(this)
+    class(solver), intent(inout) :: this
+    real(double_p) :: ts,te,l2W
+
+    do while (this%run_time%loop())
+
+      ts = MPI_Wtime()
+      
+      call this%lap%apply_hturb(this%w,&
+                                this%f,&
+                                this%f0,&
+                                this%lf,&
+                                this%dlf,&
+                                0.5d0*this%run_time%dt,&
+                                this%nu,&
+                                this%alpha,&
+                                this%theta)
+
+     call this%isomp()
+
+     call this%lap%apply_hturb(this%w,&
+                               this%f,&
+                               this%f0,&
+                               this%lf,&
+                               this%dlf,&
+                               0.5d0*this%run_time%dt,&
+                               this%nu,&
+                               this%alpha,&
+                               this%theta)
+                
+       
+      if (this%run_time%output()) then
+        call this%run_time%write_out(this%fields_dir)
+        
+        !write vorticity
+        call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write stream-function
+        call this%psi%copy_values(this%w)
+        call this%lap%apply_inv(this%psi)
+        call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
+        
+        !write velocity
+        call this%lap%write_out_vel(this%psi,this%run_time%output_dir,&
+                                    this%fields_dir,this%Tu,this%u)
+        
+        !write sph coefficients of vorticity
+        call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
+        
+        !write sph coefficients of forcing
+        call this%lap%compute_sph_coeff(this%f,this%run_time%output_dir,this%fields_dir)
+      end if
+      
+      l2W = this%w%l2_norm()
+      if (IS_MASTER) then
+        write(*,'(A,'//double_format_(2:10)//')') '    l2(W): ', l2W
+      end if 
+      
+      te = MPI_Wtime()
+    
+      call info_run_cpu_time(ts,te)
+
+    end do
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
   subroutine solve_qg_flow(this)
     class(solver), intent(inout) :: this
     
@@ -395,30 +470,16 @@ contains
         call this%w%write_to_disk(this%run_time%output_dir,this%fields_dir)
         
         !write stream-function
-        select case(this%flow)
-          case(QG_FLOW)
-            call this%psi%subtract(this%w,this%f_cor)
-          case default
-            call this%psi%copy_values(this%w)
-        end select
-
-        !apply inverse operator: laplacian/helmholtz
-        select case(this%flow)
-          case(QG_FLOW)
-            call this%lap%apply_inv_helmholtz(this%psi)
-          case default
-            call this%lap%apply_inv(this%psi)
-        end select
-
+        call this%psi%copy_values(this%w)
+        call this%lap%apply_inv(this%psi)
         call this%psi%write_to_disk(this%run_time%output_dir,this%fields_dir)
         
         !write velocity
         ! -- call this%lap%write_out_vel(this%psi,this%run_time%output_dir,&
         !                                this%fields_dir,this%Tu,this%u)
         
-        !write sph coefficients of vorticity and stream-function
+        !write sph coefficients of vorticity
         call this%lap%compute_sph_coeff(this%w,this%run_time%output_dir,this%fields_dir)
-        call this%lap%compute_sph_coeff(this%psi,this%run_time%output_dir,this%fields_dir)
       end if
       
       te = MPI_Wtime()
@@ -467,7 +528,7 @@ contains
     
     !set RHS stream-function problem
     select case(this%flow)
-      case(QG_FLOW)
+      case(QG_FLOW,QG_TURB_FLOW)
         call this%psi%subtract(this%wt,this%f_cor)
       case default
         call this%psi%copy_values(this%wt)
@@ -475,7 +536,7 @@ contains
 
     !apply inverse operator: laplacian/helmholtz
     select case(this%flow)
-      case(QG_FLOW)
+      case(QG_FLOW,QG_TURB_FLOW)
         call this%lap%apply_inv_helmholtz(this%psi)
       case default
         call this%lap%apply_inv(this%psi)
@@ -534,7 +595,7 @@ contains
     
       !set RHS stream-function problem
       select case(this%flow)
-        case(QG_FLOW)
+        case(QG_FLOW,QG_TURB_FLOW)
           call this%psi%subtract(this%wt0,this%f_cor)
         case default
           call this%psi%copy_values(this%wt0)
@@ -542,7 +603,7 @@ contains
 
       !apply inverse operator: laplacian/helmholtz
       select case(this%flow)
-        case(QG_FLOW)
+        case(QG_FLOW,QG_TURB_FLOW)
           call this%lap%apply_inv_helmholtz(this%psi)
         case default
           call this%lap%apply_inv(this%psi)

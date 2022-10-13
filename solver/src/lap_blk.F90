@@ -1131,7 +1131,7 @@ contains
     type(par_file) :: pfile
     real(double_p) :: dt,nu,alpha,theta,k_hel
     
-    if ((flow==H_TURB).OR.(flow==D_TURB)) then
+    if ((flow==H_TURB).OR.(flow==D_TURB).OR.(flow==QG_TURB_FLOW)) then
       call pfile%ctor('input_parameters','specs')
       call pfile%read_parameter(dt,'dt')
       call pfile%read_parameter(nu,'nu')
@@ -1143,7 +1143,7 @@ contains
       alpha = alpha - 2.d0*nu
     end if
     
-    if (flow==QG_FLOW) then
+    if ((flow==QG_FLOW).OR.(flow==QG_TURB_FLOW)) then
       call pfile%ctor('input_parameters','specs')
       call pfile%read_parameter(k_hel,'k_hel')
     end if
@@ -1172,7 +1172,7 @@ contains
         this%tds(i)%e(j)%im=0.d0
       end do
       
-      if (flow==QG_FLOW) then
+      if ((flow==QG_FLOW).OR.(flow==QG_TURB_FLOW)) then
         call reallocate_array(this%tds(i)%dh,1,n-m)
         call reallocate_array(this%tds(i)%u,1,n-m)
         do j=1,n-m
@@ -1191,7 +1191,7 @@ contains
         end if
       end if
       
-      if ((flow==H_TURB).OR.(flow==D_TURB)) then
+      if ((flow==H_TURB).OR.(flow==D_TURB).OR.(flow==QG_TURB_FLOW)) then
         !init Laplacian
         call compute_tmat(n,m,this%tds(i)%dl,this%tds(i)%el)
         this%tds(i)%dl=-this%tds(i)%dl
