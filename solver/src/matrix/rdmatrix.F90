@@ -16,7 +16,7 @@ module rdmatrix_mod
     procedure, public :: rdmatrix_ctor_set_pgrid
     generic, public :: ctor => rdmatrix_ctor_opt_pgrid,&
                                rdmatrix_ctor_set_pgrid
-    procedure, public :: delete => delete_rdmatrix
+    procedure, public :: delete
     procedure, public :: cyclic_to_column
     procedure, public :: column_to_cyclic
     
@@ -27,7 +27,7 @@ module rdmatrix_mod
   
   private :: rdmatrix_ctor_opt_pgrid,&
              rdmatrix_ctor_set_pgrid,&
-             delete_rdmatrix,&
+             delete,&
              cyclic_to_column,&
              column_to_cyclic,&
              equal
@@ -35,7 +35,7 @@ module rdmatrix_mod
 contains
 
 !========================================================================================!
-  subroutine delete_rdmatrix(this,delete_mpi)
+  subroutine delete(this,delete_mpi)
     class(rdmatrix), intent(inout) :: this
     logical, intent(in), optional :: delete_mpi
     

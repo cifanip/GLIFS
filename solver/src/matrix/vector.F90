@@ -24,6 +24,9 @@ module vector_mod
     
     complex(double_p), allocatable, dimension(:), public :: v
     
+    !global array (used for i.c. only)
+    complex(double_p), allocatable, dimension(:), public :: vg
+    
     contains
     
     procedure :: vector_ctor_opt_pgrid
@@ -32,10 +35,11 @@ module vector_mod
                                vector_ctor_set_pgrid
     procedure, public :: delete
     procedure, public :: default_parameters
-    procedure :: init_descriptor => init_vector_descriptor
+    procedure :: init_descriptor
     procedure :: set_local_size
     procedure :: set_block_size
     procedure, public :: write_to_disk
+    procedure, public :: all_gather
 
   end type
   
@@ -43,10 +47,11 @@ module vector_mod
              vector_ctor_set_pgrid,&
              delete,&
              default_parameters,&
-             init_vector_descriptor,&
+             init_descriptor,&
              set_local_size,&
              set_block_size,&
-             write_to_disk
+             write_to_disk,&
+             all_gather
 
 contains
 
@@ -57,6 +62,7 @@ contains
     
     call this%default_parameters()
     call deallocate_array(this%v)
+    call deallocate_array(this%vg)
     call this%delete_matrix(delete_mpi)
         
   end subroutine
@@ -155,7 +161,7 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine init_vector_descriptor(this)
+  subroutine init_descriptor(this)
     class(vector), intent(inout) :: this
 
     !set descriptor
@@ -277,6 +283,38 @@ contains
       call MPI_BARRIER(this%comm,err)
       
     end if
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine all_gather(this)
+    class(vector), intent(inout) :: this
+    integer, allocatable, dimension(:) :: displs,recvcount
+    integer :: i,n_val,ierror
+    
+    if (.not.this%is_allocated) then
+      return
+    end if
+    
+    call allocate_array(this%vg,1,this%n)
+    this%vg=(0.d0,0.d0)
+    
+    n_val = this%nrow
+    
+    call allocate_array(recvcount,0,this%nprocs-1)
+    call allocate_array(displs,0,this%nprocs-1)
+    
+    call MPI_ALLGATHER(n_val,1,MPI_INTEGER,recvcount,1,MPI_INTEGER,&
+                       this%comm,ierror)    
+    
+    displs(0)=0
+    do i=1,this%nprocs-1
+      displs(i)=displs(i-1)+recvcount(i-1)
+    end do
+    
+    call MPI_ALLGATHERV(this%v,this%nrow,MPI_DOUBLE_COMPLEX,this%vg,&
+                        recvcount,displs,MPI_DOUBLE_COMPLEX,this%comm,ierror)
 
   end subroutine
 !========================================================================================!

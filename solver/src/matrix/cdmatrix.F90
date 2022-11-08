@@ -23,7 +23,7 @@ module cdmatrix_mod
     generic, public :: ctor => cdmatrix_ctor_opt_pgrid,&
                                cdmatrix_ctor_set_pgrid
     
-    procedure, public :: delete => delete_cdmatrix
+    procedure, public :: delete
     procedure, public :: cyclic_to_column
     procedure, public :: column_to_cyclic
     procedure, public :: write_to_disk
@@ -50,7 +50,7 @@ module cdmatrix_mod
   
   private :: cdmatrix_ctor_opt_pgrid,&
              cdmatrix_ctor_set_pgrid,&
-             delete_cdmatrix,&
+             delete,&
              cyclic_to_column,&
              column_to_cyclic,&
              write_to_disk,&
@@ -88,7 +88,7 @@ module cdmatrix_mod
 contains
 
 !========================================================================================!
-  recursive subroutine delete_cdmatrix(this,delete_mpi)
+  recursive subroutine delete(this,delete_mpi)
     class(cdmatrix), intent(inout) :: this
     logical, intent(in), optional :: delete_mpi
  

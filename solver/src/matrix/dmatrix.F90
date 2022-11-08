@@ -34,7 +34,7 @@ module dmatrix_mod
     procedure :: set_local_size
     procedure :: set_block_size
     procedure :: default_parameters
-    procedure :: init_descriptor => init_dmatrix_descriptor
+    procedure :: init_descriptor
 
     procedure, public :: equal_dmatrix
 
@@ -46,7 +46,7 @@ module dmatrix_mod
              set_block_size,&
              default_parameters,&
              equal_dmatrix,&
-             init_dmatrix_descriptor
+             init_descriptor
 
 contains
 
@@ -262,7 +262,7 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine init_dmatrix_descriptor(this)
+  subroutine init_descriptor(this)
     class(dmatrix), intent(inout) :: this
     integer :: info
     
