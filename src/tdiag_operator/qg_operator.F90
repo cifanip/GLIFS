@@ -41,7 +41,9 @@ module qg_operator_mod
              init_blks
              
   private :: store_factorization,&
-             solve_inv_hel
+             solve_inv_hel,&
+             build_T20,&
+             compute_sin_sq
 
 contains
 
@@ -122,6 +124,7 @@ contains
     real(double_p), allocatable, dimension(:) :: d_aux,e_aux
     real(double_p) :: k_hel
     integer :: i,j,n,m,err
+    complex(double_p), allocatable, dimension(:) :: t
     type(par_file) :: pfile
     
     call pfile%ctor('input_parameters','specs')
@@ -132,6 +135,9 @@ contains
     end if
     
     n=this%n
+    
+    call build_T20(n,t)
+    call compute_sin_sq(n,t)
     
     allocate(this%tds(1:size(this%d_midx)),stat=err)
     if (err /= 0) then
@@ -153,7 +159,7 @@ contains
       call reallocate_array(this%tds(i)%d,1,n-m)
       call reallocate_array(this%tds(i)%u,1,n-m)
       do j=1,n-m
-        this%tds(i)%d(j)%re = d_aux(j) - k_hel 
+        this%tds(i)%d(j)%re = d_aux(j) - k_hel*0.5d0*(t(j)+t(j+m))
         this%tds(i)%d(j)%im = 0.d0
       end do
       this%tds(i)%u=this%tds(i)%e
@@ -205,6 +211,49 @@ contains
     if (info.ne.0) then
       call abort_run('zgttrs in lap_blk failed',info)
     end if
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine compute_sin_sq(n,t)
+    integer, intent(in) :: n
+    complex(double_p), allocatable, dimension(:), intent(inout) :: t
+    integer :: i
+    complex(double_p) :: im
+    real(double_p) :: x,y
+    
+    im=(0.d0,1.d0)
+    
+    do i=1,n
+      x=(4.d0/3.d0)*sqrt(pi/n)
+      y=-(4.d0/3.d0)*sqrt(pi/5.d0)
+      t(i) = im*(x+y*t(i))
+    end do
+    
+    t=-im*t*sqrt(n/(4.d0*pi))
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine build_T20(n,t)
+    integer, intent(in) :: n
+    complex(double_p), allocatable, dimension(:), intent(out) :: t
+    integer :: i
+    real(double_p) :: s,c,j
+    
+    call allocate_array(t,1,n)
+    
+    s = real(n-1)/real(2.d0)
+    
+    c = sqrt((2.d0*s+3.d0)*(2.d0*s+2.d0)*(2.d0*s+1.d0)*2.d0*s*(2.d0*s-1.d0))
+    
+    do i=1,n
+      j = i-s-1.d0
+      t(i)%re = sqrt(5.d0)*(2.d0*(3*j*j-s*(s+1.d0)))/c
+      t(i)%im = 0.d0
+    end do
 
   end subroutine
 !========================================================================================!
