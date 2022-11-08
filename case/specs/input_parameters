@@ -1,0 +1,23 @@
+!ISO AMP = 0
+integrator 0
+
+!IC_TEST   = 0
+!IC_ZERO   = 1
+!IC_RANDOM = 2
+initial_conditions 2
+
+N 32
+nprow 1
+npcol 1
+
+Tf 1.0d0
+dt 5.0d-3
+input_folder 0
+write_interval -1
+dtout 1.d-1
+
+tol 1.d-12
+max_iter 100
+
+l_min 2
+l_max 31
