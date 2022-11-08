@@ -1,0 +1,47 @@
+# Makefile
+EXE = QGf_glifs_intel
+
+COMPILER = mpiifort
+
+########################## 	libraries setting
+# MPI
+MPI_FLAGS =
+MPI_LIBS  = $(MPI_FLAGS)
+
+# ScaLAPACK
+LA_FLAGS  = -lmkl_blas95_lp64 -lmkl_scalapack_lp64 -lmkl_intel_lp64 \
+-lmkl_intel_thread -lmkl_core -lmkl_blacs_intelmpi_lp64
+LA_LIBS   = $(LA_FLAGS)
+
+LIBS = $(MPI_LIBS) $(LA_LIBS)
+
+########################## 	look for source files
+SOURCE=../../src
+
+########################## 	includers
+MPI_INCL=
+MKL_INCL=$(MKLROOT)/include
+SRC_INCL=-I$(SOURCE)
+
+########################## 	compiler flag
+CMP_FLAG = CMP_INTEL
+
+########################## 	multi-threading
+MT_FLAG = -qopenmp
+
+########################## 	place obj files
+OBJDIR=OBJ_$(EXE)
+MKDIR_OBJ := $(shell mkdir -p $(OBJDIR))
+OBJDIR_FLAG = -module $(OBJDIR)
+
+##########################  compiler options
+#debug
+#FLAGS = -g -traceback -C $(MT_FLAG) $(OBJDIR_FLAG)
+#optimal
+FLAGS = -O3 -traceback $(MT_FLAG) $(OBJDIR_FLAG)
+
+#--------------------------compile
+include makefile_source
+
+clean : 
+	rm -rf $(EXE) $(OBJDIR)
