@@ -1,0 +1,12 @@
+#!/bin/bash
+
+solvers=("Euler" "NS" "QG" "QGf")
+
+for str in ${solvers[@]}; do
+  cd solvers/$str
+  echo "COMPILING SOLVER: $str"
+  make -f makefile_intel $1
+  echo "DONE"
+  echo ""
+  cd ../../
+done
