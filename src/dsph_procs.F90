@@ -111,7 +111,7 @@ contains
     call f%rename('f')
     
     !set spectral space box width to 2
-    dlf = 0
+    dlf = 2
     
     allocate(f0(2*dlf+1),stat=err)
     if (err /= 0) then
