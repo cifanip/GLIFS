@@ -1,0 +1,87 @@
+OBJ = kinds.o formats.o prun.o allocate_arrays.o par_file.o aux.o \
+mpi_control.o matrix.o dmatrix.o rdmatrix.o cdmatrix.o vector.o tdiag_operator.o \
+laplacian.o dsph_procs.o qg_operator.o integrator.o iso_amp.o integrators.o time.o \
+ic.o QG_glifs.o
+
+OBJ_LIST = $(foreach O, ${OBJ}, $(OBJDIR)/$(O))
+
+$(EXE) : $(OBJ_LIST)
+	$(COMPILER) -o $(EXE) $(OBJ_LIST) $(LIBS) $(MT_FLAG)
+
+################################### SOURCE FILES #########################################
+$(OBJDIR)/kinds.o: $(SOURCE)/kinds.F90
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/formats.o: $(SOURCE)/formats.F90
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/prun.o: $(SOURCE)/prun.F90
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/allocate_arrays.o: $(SOURCE)/allocate_arrays/* $(OBJDIR)/kinds.o \
+$(OBJDIR)/prun.o
+	$(COMPILER) -c $(FLAGS) $(SOURCE)/allocate_arrays/allocate_arrays.F90 -o $@
+
+$(OBJDIR)/par_file.o: $(SOURCE)/par_file.F90 $(OBJDIR)/prun.o $(OBJDIR)/kinds.o \
+$(OBJDIR)/formats.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/aux.o: $(SOURCE)/aux.F90 $(OBJDIR)/allocate_arrays.o
+	$(COMPILER) -c $(FLAGS) -D$(CMP_FLAG) $< -o $@
+
+$(OBJDIR)/mpi_control.o: $(SOURCE)/mpi_control.F90 $(OBJDIR)/allocate_arrays.o \
+$(OBJDIR)/par_file.o $(OBJDIR)/aux.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/matrix.o: $(SOURCE)/matrix/matrix.F90 $(OBJDIR)/mpi_control.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/dmatrix.o: $(SOURCE)/matrix/dmatrix.F90 $(OBJDIR)/matrix.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/rdmatrix.o: $(SOURCE)/matrix/rdmatrix.F90 $(OBJDIR)/dmatrix.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/cdmatrix.o: $(SOURCE)/matrix/cdmatrix.F90 $(OBJDIR)/dmatrix.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/vector.o: $(SOURCE)/matrix/vector.F90 $(OBJDIR)/matrix.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/tdiag_operator.o: $(SOURCE)/tdiag_operator/tdiag_operator.F90 \
+$(OBJDIR)/cdmatrix.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+	
+$(OBJDIR)/laplacian.o: $(SOURCE)/tdiag_operator/laplacian.F90 \
+$(OBJDIR)/tdiag_operator.o $(OBJDIR)/rdmatrix.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/dsph_procs.o: $(SOURCE)/dsph_procs.F90 $(OBJDIR)/laplacian.o \
+$(OBJDIR)/ic.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/qg_operator.o: $(SOURCE)/tdiag_operator/qg_operator.F90 \
+$(OBJDIR)/dsph_procs.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/integrator.o: $(SOURCE)/integrator/integrator.F90 \
+$(OBJDIR)/tdiag_operator.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/iso_amp.o: $(SOURCE)/integrator/iso_amp.F90 $(OBJDIR)/integrator.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/integrators.o: $(SOURCE)/integrator/integrators.F90 $(OBJDIR)/iso_amp.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/time.o: $(SOURCE)/time.F90 $(OBJDIR)/allocate_arrays.o \
+$(OBJDIR)/par_file.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/ic.o: $(SOURCE)/ic.F90 $(OBJDIR)/vector.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/QG_glifs.o: QG.F90 $(OBJDIR)/time.o $(OBJDIR)/qg_operator.o \
+$(OBJDIR)/integrators.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+##########################################################################################
