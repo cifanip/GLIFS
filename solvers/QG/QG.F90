@@ -108,9 +108,6 @@ contains
 
       call compute_ic(lap,w)
       
-      !set mode (1,0) equal to planetary vorticity
-      w%m = w%m + qg_op%f%m
-      
       if (IS_MASTER) then
         write(*,'(A)') 'Vorticity initialized by computing i.c.'
       end if
