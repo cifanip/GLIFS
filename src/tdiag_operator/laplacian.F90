@@ -16,6 +16,7 @@ module laplacian_mod
   end type
 
   type, extends(tdiag_operator), public :: laplacian
+    private
     
     !used to apply inverse
     type(tdiags), allocatable, dimension(:) :: tdsi
