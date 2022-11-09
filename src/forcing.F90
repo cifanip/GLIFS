@@ -8,12 +8,13 @@ module forcing_mod
   integer, parameter :: HTURB_FORCING  = 1
 
   type, public :: forcing
+    private
     
     !turb. forcing matrices
     type(cdmatrix), allocatable, dimension(:) :: f0
 
     !resultant forcing matrix
-    type(cdmatrix) :: f
+    type(cdmatrix), public :: f
     
     !auxiliary matrix
     type(cdmatrix) :: q
