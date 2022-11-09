@@ -6,6 +6,7 @@ module ns_operator_mod
   implicit none
   
   type, private :: tdiags
+    private
     
     !diagonal element Laplacian
     real(double_p), allocatable, dimension(:) :: d
@@ -16,6 +17,7 @@ module ns_operator_mod
   end type
 
   type, extends(tdiag_operator), public :: ns_operator
+    private
     
     type(tdiags), allocatable, dimension(:) :: tds
     

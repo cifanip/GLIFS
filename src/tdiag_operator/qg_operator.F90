@@ -5,6 +5,7 @@ module qg_operator_mod
   implicit none
   
   type, private :: tdiags
+    private
 
     !diagonal element Helmholtz
     complex(double_p), allocatable, dimension(:) :: d
@@ -19,11 +20,12 @@ module qg_operator_mod
   end type
 
   type, extends(tdiag_operator), public :: qg_operator
+    private
     
     type(tdiags), allocatable, dimension(:) :: tds
     
     !coriolis matrix
-    type(cdmatrix) :: f
+    type(cdmatrix), public :: f
     
     contains
     

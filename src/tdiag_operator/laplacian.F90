@@ -6,6 +6,7 @@ module laplacian_mod
   implicit none
   
   type, private :: tdiags
+    private
     
     !diagonal element Laplacian
     real(double_p), allocatable, dimension(:) :: d
