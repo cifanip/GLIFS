@@ -89,6 +89,6 @@ $(OBJDIR)/ic.o: $(SOURCE)/ic.F90 $(OBJDIR)/vector.o
 	$(COMPILER) -c $(FLAGS) $< -o $@
 
 $(OBJDIR)/QGf_glifs.o: QGf.F90 $(OBJDIR)/time.o $(OBJDIR)/ns_operator.o \
-$(OBJDIR)/ns_operator.o $(OBJDIR)/integrators.o
+$(OBJDIR)/qg_operator.o $(OBJDIR)/integrators.o
 	$(COMPILER) -c $(FLAGS) $< -o $@
 ##########################################################################################
