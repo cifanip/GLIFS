@@ -5,6 +5,7 @@ module iso_amp_mod
   implicit none
 
   type, extends(integrator), public :: iso_amp
+    private
 
     !work matrices
     type(cdmatrix) :: wt0,wt,psi_wt,psi_wth,&
