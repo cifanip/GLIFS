@@ -40,7 +40,7 @@ module ns_operator_mod
     procedure, public :: delete
     procedure, public :: ctor
     procedure, public :: apply_inv
-    procedure, public :: apply_forced
+    procedure :: apply_forced
     
     procedure :: init_blks
     
