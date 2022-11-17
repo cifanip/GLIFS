@@ -1,6 +1,6 @@
 #!/bin/bash
 
-solvers=("Euler" "NS" "QG" "QGf" "QGf_hyper" "NS_rot")
+solvers=("Euler" "NS" "QG" "QGf" "NS_rot")
 
 for str in ${solvers[@]}; do
   cd solvers/$str
