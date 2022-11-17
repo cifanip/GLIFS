@@ -30,7 +30,7 @@ PROGRAM main
   
   call init_solver()
 
-  call solve_euler()
+  call solve_main()
   
   call delete_solver()
   
