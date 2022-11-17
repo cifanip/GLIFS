@@ -36,7 +36,7 @@ PROGRAM main
   
   call init_solver()
 
-  call solve_ns()
+  call solve_main()
   
   call delete_solver()
   
@@ -50,7 +50,7 @@ PROGRAM main
 contains
 
 !========================================================================================!
-  subroutine solve_ns()
+  subroutine solve_main()
     
     !cycle time loop
     do while (run_time%loop())
