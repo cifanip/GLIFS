@@ -112,8 +112,8 @@ contains
     end if
     
     !initial guess of group element
-    call this%euler_fwd(top,w,psi,dt_opt)
-    !call this%expl_mp(top,w,psi,dt_opt)
+    !-- call this%euler_fwd(top,w,psi,dt_opt)
+    !-- call this%expl_mp(top,w,psi,dt_opt)
     this%g0%m=this%g%m
 
     !scale commutator
