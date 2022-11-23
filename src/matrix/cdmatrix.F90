@@ -42,6 +42,7 @@ module cdmatrix_mod
     procedure :: set_global_indexes
     procedure, public :: allocate_ptrm
     procedure :: s_mul
+    procedure, public :: set_identity
     
     procedure :: equal
     generic, public :: assignment(=) => equal
@@ -68,7 +69,8 @@ module cdmatrix_mod
              set_global_indexes,&
              is_stored,&
              allocate_ptrm,&
-             s_mul
+             s_mul,&
+             set_identity
              
   interface
     real(double_p) function pzlange(norm,m,n,a,ia,ja,desca,work)
@@ -841,6 +843,28 @@ contains
       call abort_run('Attempt to allocate an associated type pointer cdmatrix ')
     end if
 	
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine set_identity(this)
+    class(cdmatrix), intent(inout) :: this
+    type(cdmatrix) :: q
+    integer :: ncol,i0g,i
+    
+    call q%ctor(this%mpic,BLOCK_COLUMN,'q',this%n,1,this%nprocs)
+    
+    ncol = q%ncol
+    i0g = get_gidx(1,q%ncblk,q%pcol,q%npcol)
+    
+    do i=1,ncol
+      q%m(i+i0g-1,i) = (1.d0,0.d0)
+    end do
+    
+    call q%column_to_cyclic(this)
+    
+    call q%delete()
+
   end subroutine
 !========================================================================================!
 
