@@ -1,6 +1,7 @@
 OBJ = kinds.o formats.o prun.o allocate_arrays.o par_file.o aux.o \
-mpi_control.o matrix.o dmatrix.o rdmatrix.o cdmatrix.o vector.o tdiag_operator.o laplacian.o \
-dsph_procs.o integrator.o iso_amp.o integrators.o time.o ic.o Euler_glifs.o
+mpi_control.o matrix.o dmatrix.o rdmatrix.o cdmatrix.o vector.o tdiag_operator.o \
+integrator.o laplacian.o dsph_procs.o iso_amp.o iso_gmp.o heun.o integrators.o time.o \
+ic.o Euler_glifs.o
 
 OBJ_LIST = $(foreach O, ${OBJ}, $(OBJDIR)/$(O))
 
@@ -50,7 +51,7 @@ $(OBJDIR)/vector.o: $(SOURCE)/matrix/vector.F90 $(OBJDIR)/matrix.o
 $(OBJDIR)/tdiag_operator.o: $(SOURCE)/tdiag_operator/tdiag_operator.F90 \
 $(OBJDIR)/cdmatrix.o
 	$(COMPILER) -c $(FLAGS) $< -o $@
-	
+
 $(OBJDIR)/laplacian.o: $(SOURCE)/tdiag_operator/laplacian.F90 \
 $(OBJDIR)/tdiag_operator.o $(OBJDIR)/rdmatrix.o
 	$(COMPILER) -c $(FLAGS) $< -o $@
@@ -66,7 +67,14 @@ $(OBJDIR)/tdiag_operator.o
 $(OBJDIR)/iso_amp.o: $(SOURCE)/integrator/iso_amp.F90 $(OBJDIR)/integrator.o
 	$(COMPILER) -c $(FLAGS) $< -o $@
 
-$(OBJDIR)/integrators.o: $(SOURCE)/integrator/integrators.F90 $(OBJDIR)/iso_amp.o
+$(OBJDIR)/iso_gmp.o: $(SOURCE)/integrator/iso_gmp.F90 $(OBJDIR)/integrator.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/heun.o: $(SOURCE)/integrator/heun.F90 $(OBJDIR)/integrator.o
+	$(COMPILER) -c $(FLAGS) $< -o $@
+
+$(OBJDIR)/integrators.o: $(SOURCE)/integrator/integrators.F90 $(OBJDIR)/iso_amp.o \
+$(OBJDIR)/iso_gmp.o $(OBJDIR)/heun.o
 	$(COMPILER) -c $(FLAGS) $< -o $@
 
 $(OBJDIR)/time.o: $(SOURCE)/time.F90 $(OBJDIR)/allocate_arrays.o \
