@@ -150,6 +150,9 @@ contains
     !write sph coefficients of vorticity
     call compute_sph_coeff(lap,psi,run_time%output_dir,fields_dir)
 
+    !write discrete diffeomorphism (if computed)
+    call integ%print_gmap(run_time%output_dir,fields_dir)
+
   end subroutine
 !========================================================================================!
 
