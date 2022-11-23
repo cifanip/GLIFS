@@ -20,6 +20,7 @@ module iso_amp_mod
     procedure, public :: delete
     procedure, public :: ctor
     procedure, public :: solve
+    procedure, public :: print_gmap
     procedure :: clean_up
     procedure :: expl
     procedure :: fpiter
@@ -29,6 +30,7 @@ module iso_amp_mod
   private :: delete,&
              ctor,&
              solve,&
+             print_gmap,&
              clean_up,&
              expl,&
              fpiter
@@ -286,6 +288,18 @@ contains
     call this%psi_wth%ptrm%delete(delete_mpi=.FALSE.)
     call this%psi_wt_psi%ptrm%delete(delete_mpi=.FALSE.)
     call this%delta_w%ptrm%delete(delete_mpi=.FALSE.)  
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine print_gmap(this,output_dir,fields_dir)
+    class(iso_amp), intent(inout) :: this
+    integer, intent(in) :: output_dir
+    character(len=*), intent(in) :: fields_dir
+    
+    !nothing to be done
+    return
 
   end subroutine
 !========================================================================================!
