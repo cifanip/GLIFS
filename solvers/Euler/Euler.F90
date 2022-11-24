@@ -45,6 +45,7 @@ contains
 
 !========================================================================================!
   subroutine solve_main()
+    real(double_p) :: ts,te
     
     !cycle time loop
     do while (run_time%loop())
