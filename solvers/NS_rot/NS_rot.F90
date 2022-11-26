@@ -80,6 +80,8 @@ contains
 
 !========================================================================================!
   subroutine init_solver()
+    type(par_file) :: pfile
+    logical :: set_w_planet
     
     call set_blas_sigle_thread()
 
@@ -115,6 +117,13 @@ contains
     else
     
       call compute_ic(lap%laplacian,w)
+      
+      !check i.c. on mode (1,0)
+      call pfile%ctor('input_parameters','specs')
+      call pfile%read_parameter(set_w_planet,'set_planet_vorticity')
+      if (set_w_planet) then
+        w%m = w%m + lap%f%m
+      end if
       
       if (IS_MASTER) then
         write(*,'(A)') 'Vorticity initialized by computing i.c.'
@@ -155,7 +164,7 @@ contains
     call w%write_to_disk(run_time%output_dir,fields_dir)
         
     !write stream-function
-    call psi%subtract(w,lap%f)
+    call psi%copy_values(w)
     call lap%apply_inv(psi)
     call psi%write_to_disk(run_time%output_dir,fields_dir)
         
