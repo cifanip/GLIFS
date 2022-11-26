@@ -72,6 +72,8 @@ contains
 
 !========================================================================================!
   subroutine init_solver()
+    type(par_file) :: pfile
+    logical :: set_w_planet
     
     call set_blas_sigle_thread()
 
@@ -108,6 +110,13 @@ contains
     else
 
       call compute_ic(lap,w)
+
+      !check i.c. on mode (1,0)
+      call pfile%ctor('input_parameters','specs')
+      call pfile%read_parameter(set_w_planet,'set_planet_vorticity')
+      if (set_w_planet) then
+        w%m = w%m + qg_op%f%m
+      end if
       
       if (IS_MASTER) then
         write(*,'(A)') 'Vorticity initialized by computing i.c.'
