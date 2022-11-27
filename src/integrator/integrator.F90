@@ -87,11 +87,12 @@ contains
 !========================================================================================!
 
 !========================================================================================!
-  subroutine update_gt_map(g,gt)
+  subroutine update_gt_map(g,aux,gt)
     type(cdmatrix), intent(in) :: g
-    type(cdmatrix), intent(inout) :: gt
+    type(cdmatrix), intent(inout) :: aux,gt
     
-    call gt%multiply(g,gt)
+    call aux%copy_values(gt)    
+    call gt%multiply(g,aux)
 
   end subroutine
 !========================================================================================!

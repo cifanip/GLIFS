@@ -186,7 +186,7 @@ contains
     call apply_Ads(this%g,this%z1,this%z2,w)
     
     !update g_t map
-    call update_gt_map(this%g,this%gt)
+    call update_gt_map(this%g,this%z1,this%gt)
 
     te = MPI_Wtime() 
 
