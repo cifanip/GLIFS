@@ -74,6 +74,8 @@ contains
     call this%gt%rename('gt')
     
     this%g  = w
+    call this%g%rename('u')
+    
     this%id = w
     this%z1 = w
     this%z2 = w
