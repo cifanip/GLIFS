@@ -340,6 +340,7 @@ contains
     character(len=*), intent(in) :: fields_dir
     
     call this%gt%write_to_disk(output_dir,fields_dir)
+    call this%g%write_to_disk(output_dir,fields_dir)
 
   end subroutine
 !========================================================================================!
