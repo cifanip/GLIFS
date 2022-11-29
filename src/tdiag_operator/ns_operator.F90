@@ -24,6 +24,9 @@ module ns_operator_mod
     !viscosity
     real(double_p) :: nu
 
+    !damping factor
+    real(double_p) :: alpha0
+
     !damping factor (accounts for 2\nu)
     real(double_p) :: alpha
 
@@ -36,6 +39,9 @@ module ns_operator_mod
     !keep a pointer to laplacian and forcing
     type(laplacian), pointer :: lap => NULL()
     type(forcing), pointer   :: forc => NULL()
+    
+    !matrix used to correct damping at mode (1,0)
+    type(cdmatrix) :: d10
     
     contains
     
@@ -59,12 +65,12 @@ contains
 !========================================================================================!
   subroutine delete(this) 
     class(ns_operator), intent(inout) :: this
-    integer :: i,ierror
     
     deallocate(this%tds)
     this%forc => NULL()
     this%lap => NULL()
     call this%delete_tdiag_operator()
+    call this%d10%delete(delete_mpi=.FALSE.)
 
   end subroutine
 !========================================================================================!
@@ -74,8 +80,9 @@ contains
     class(ns_operator), intent(out) :: this
     type(mpi_control), intent(in), target :: mpic
     type(cdmatrix), intent(in) :: w
-    type(laplacian), intent(in), target :: lap
+    type(laplacian), intent(inout), target :: lap
     type(forcing), intent(in), target :: forc
+    complex(double_p) :: t
     
     call this%init_tdiag_operator(mpic,w)
     
@@ -84,7 +91,12 @@ contains
     this%lap  => lap
     
     this%forc => forc
-
+    
+    call init_T10_matrix(lap,w,this%d10)
+    call this%d10%ptrm%multiply(w,this%d10)
+    t=-this%d10%ptrm%trace()    
+    this%d10%m = t*this%dt*this%alpha0*this%d10%m
+    
   end subroutine
 !========================================================================================!
 
@@ -125,11 +137,12 @@ contains
     s=this%theta*this%dt*this%alpha
 
     !$OMP PARALLEL DO DEFAULT(none) &
-    !$OMP SHARED(nrow,ncol,r,s,w,forc) &
+    !$OMP SHARED(this,nrow,ncol,r,s,w,forc) &
     !$OMP PRIVATE(i,j)
     do j=1,ncol
       do i=1,nrow
-        w%m(i,j)=r*w%m(i,j) + (1.d0-s)*forc%f%ptrm%m(i,j) + forc%f%m(i,j)
+        w%m(i,j)=r*w%m(i,j) + (1.d0-s)*forc%f%ptrm%m(i,j) + forc%f%m(i,j)+&
+                 this%d10%m(i,j)
       end do
     end do
     !$OMP END PARALLEL DO
@@ -152,6 +165,9 @@ contains
     
     call this%buffer_to_diags()
     call this%q%column_to_cyclic(w)
+    
+    !w%m = w%m + this%d10%m
+    
     call w%make_skewh()
 
     te = MPI_Wtime() 
@@ -178,13 +194,12 @@ contains
     theta = 0.5d0
     !symmetric strang splitting
     dt=0.5d0*dt
-    !account for term \nu \omega
-    alpha = alpha - 2.d0*nu
     
-    this%nu=nu
-    this%alpha=alpha
-    this%dt=dt
-    this%theta=theta
+    this%nu = nu
+    this%alpha0 = alpha
+    this%alpha = alpha - 2.d0*nu
+    this%dt = dt
+    this%theta = theta
     
     if (.not.this%q%is_allocated) then
       return
@@ -212,7 +227,7 @@ contains
         this%tds(i)%e(j)%im=0.d0
       end do
       this%tds(i)%d = -(1.d0-theta)*dt*nu*this%tds(i)%d +1.d0 +&
-                       (1.d0-theta)*dt*alpha
+                       (1.d0-theta)*dt*this%alpha
       call store_factorization_lap(this%tds(i)%d,this%tds(i)%e)
       
     end do
