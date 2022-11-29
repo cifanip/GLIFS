@@ -112,6 +112,8 @@ contains
       end do
     end do
     !$OMP END PARALLEL DO
+    
+    call w%is_nan()
 
     te = MPI_Wtime() 
 
