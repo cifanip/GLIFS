@@ -43,6 +43,8 @@ module cdmatrix_mod
     procedure, public :: allocate_ptrm
     procedure :: s_mul
     procedure, public :: set_identity
+    procedure, public :: is_nan
+    procedure, public :: trace
     
     procedure :: equal
     generic, public :: assignment(=) => equal
@@ -70,7 +72,9 @@ module cdmatrix_mod
              is_stored,&
              allocate_ptrm,&
              s_mul,&
-             set_identity
+             set_identity,&
+             is_nan,&
+             trace
              
   interface
     real(double_p) function pzlange(norm,m,n,a,ia,ja,desca,work)
@@ -81,6 +85,15 @@ module cdmatrix_mod
       complex(double_p) :: a(*)
       real(double_p) :: work(*)
     end function pzlange
+  end interface
+
+  interface
+    complex(double_p) function pzlatra(n,a,ia,ja,desca)
+      import
+      integer :: n,ia,ja
+      complex(double_p) :: a(*)
+      integer :: desca(*)
+    end function pzlatra
   end interface
   
   !out of type
@@ -866,6 +879,50 @@ contains
     call q%delete()
 
   end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine is_nan(this)
+    class(cdmatrix), intent(inout) :: this
+    integer :: i,j,ncol,nrow
+    logical :: is_re_nan,is_im_nan
+    
+    if (.not.this%is_allocated) then
+      return
+    end if
+    
+    ncol=this%ncol
+    nrow=this%nrow
+    
+    !$OMP PARALLEL DO DEFAULT(none) &
+    !$OMP SHARED(this,nrow,ncol) &
+    !$OMP PRIVATE(i,j,is_re_nan,is_im_nan)
+    do j=1,ncol
+      do i=1,nrow
+        is_re_nan=isnan(this%m(i,j)%re)
+        is_im_nan=isnan(this%m(i,j)%im)
+        if ((is_re_nan).or.(is_im_nan)) then
+          call abort_run('NaN found in matrix '//adjustl(trim(this%fname)))
+        end if
+      end do
+    end do
+    !$OMP END PARALLEL DO    
+
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  function trace(this) result(r)
+    class(cdmatrix), intent(inout) :: this
+    complex(double_p) :: r
+    
+    if (.not.this%is_allocated) then
+      return
+    end if
+
+    r = pzlatra(this%n,this%m,1,1,this%desc)
+
+  end function
 !========================================================================================!
 
 end module cdmatrix_mod
