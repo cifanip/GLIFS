@@ -165,9 +165,6 @@ contains
     
     call this%buffer_to_diags()
     call this%q%column_to_cyclic(w)
-    
-    !w%m = w%m + this%d10%m
-    
     call w%make_skewh()
 
     te = MPI_Wtime() 
