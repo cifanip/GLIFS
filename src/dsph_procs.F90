@@ -12,6 +12,7 @@ module dsph_procs_mod
   public :: compute_ic,&
             init_hturb_forcing,&
             init_coriolis_matrix,&
+            init_T10_matrix,&
             compute_sph_coeff
              
   private :: add_q_component,&
@@ -176,34 +177,45 @@ contains
     type(cdmatrix), intent(in) :: w
     type(cdmatrix), intent(inout) :: f
     real(double_p) :: cor_par
-    type(ic) :: ic_cor
-    integer :: l,m
     type(par_file) :: pfile
-    
-    f = w
     
     call pfile%ctor('input_parameters','specs')
     call pfile%read_parameter(cor_par,'cor_par')
     
+    call init_T10_matrix(lap,w,f)
+    
+    f%m = cor_par*f%m
+    
+  end subroutine
+!========================================================================================!
+
+!========================================================================================!
+  subroutine init_T10_matrix(lap,w,T10)
+    type(laplacian), intent(inout) :: lap
+    type(cdmatrix), intent(in) :: w
+    type(cdmatrix), intent(inout) :: T10
+    type(ic) :: ic_obj
+    integer :: l,m
+    
+    T10 = w
+    
     l=1
     m=0
     
-    call ic_cor%ic_gen_Tbase(lap%mpic,lap%n,l,m)
+    call ic_obj%ic_gen_Tbase(lap%mpic,lap%n,l,m)
     
     call lap%q%set_to_zero()
     call lap%v%ctor(lap%mpic,BLOCK_CYCLIC,lap%n-m,1,1)
     call compute_eigv(lap%n,lap%v%n,lap%v%npcol,lap%v%nrow,lap%v%ncol,&
                       lap%v%is_allocated,lap%v%desc,lap%v%m)
-    call add_q_component(lap,lap%q,ic_cor)
+    call add_q_component(lap,lap%q,ic_obj)
     call lap%v%delete()
     
     !iT_{1,0}
-    call lap%q%column_to_cyclic(f)
+    call lap%q%column_to_cyclic(T10)
     
-    f%m = cor_par*f%m
-    
-    call ic_cor%delete()
-    
+    call ic_obj%delete()    
+
   end subroutine
 !========================================================================================!
 
