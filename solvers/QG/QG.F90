@@ -157,7 +157,7 @@ contains
     !write sph coefficients of vorticity
     call compute_sph_coeff(lap,w,run_time%output_dir,fields_dir)
         
-    !write sph coefficients of vorticity
+    !write sph coefficients of stream function
     call compute_sph_coeff(lap,psi,run_time%output_dir,fields_dir)
 
     !write discrete diffeomorphism (if computed)
