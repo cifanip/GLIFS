@@ -28,7 +28,6 @@ contains
 !========================================================================================!
   subroutine delete(this) 
     class(lap_rot), intent(inout) :: this
-    integer :: i,ierror
     
     call this%f%delete(delete_mpi=.FALSE.)  
     call this%laplacian%delete()
