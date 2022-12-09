@@ -1,11 +1,11 @@
 #!/bin/bash
 
-solvers=("Euler" "Euler_rot" "NS" "NS_rot" "QG" "QGf")
+solvers=("Euler" "Euler_rot" "NS" "NS_rot" "QG" "QGf" "Euler_db")
 
 for str in ${solvers[@]}; do
   cd solvers/$str
   echo "COMPILING SOLVER: $str"
-  make -f makefile_gnu $1
+  make -f makefile_intel $1
   echo "DONE"
   echo ""
   cd ../../
