@@ -9,6 +9,8 @@ module dbracket_mod
     
     type(cdmatrix) :: z1,z2,z3
     
+    real(double_p) :: alpha
+    
     contains
     
     procedure, public :: delete
@@ -41,12 +43,16 @@ contains
     class(dbracket), intent(out) :: this
     type(mpi_control), intent(in), target :: mpic
     type(cdmatrix), intent(in) :: w
+    type(par_file) :: pfile
     
     call this%laplacian%ctor(mpic,w)
     
     this%z1 = w
     this%z2 = w
     this%z3 = w
+
+    call pfile%ctor('input_parameters','specs')
+    call pfile%read_parameter(this%alpha,'alpha_db')
 
   end subroutine
 !========================================================================================!
@@ -72,7 +78,7 @@ contains
     !$OMP PRIVATE(i,j)
     do j=1,ncol
       do i=1,nrow
-        w%m(i,j) = w%m(i,j) + this%z2%m(i,j) - this%z3%m(i,j)
+        w%m(i,j) = w%m(i,j) + this%alpha*(this%z2%m(i,j) - this%z3%m(i,j))
       end do
     end do
     !$OMP END PARALLEL DO
