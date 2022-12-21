@@ -52,7 +52,6 @@ contains
 !========================================================================================!
   subroutine delete(this) 
     class(qg_operator), intent(inout) :: this
-    integer :: i,ierror
     
     deallocate(this%tds)
     call this%f%delete(delete_mpi=.FALSE.)  

@@ -57,7 +57,6 @@ contains
 !========================================================================================!
   subroutine delete(this) 
     class(laplacian), intent(inout) :: this
-    integer :: i,ierror
     
     deallocate(this%tdsi)
     deallocate(this%tds)
