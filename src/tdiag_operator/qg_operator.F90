@@ -52,6 +52,7 @@ contains
 !========================================================================================!
   subroutine delete(this) 
     class(qg_operator), intent(inout) :: this
+    integer :: i,ierror
     
     deallocate(this%tds)
     call this%f%delete(delete_mpi=.FALSE.)  
@@ -160,7 +161,7 @@ contains
       call reallocate_array(this%tds(i)%d,1,n-m)
       call reallocate_array(this%tds(i)%u,1,n-m)
       do j=1,n-m
-        this%tds(i)%d(j)%re = d_aux(j) - k_hel*0.5d0*(t(j)%re+t(j+m)%re)
+        this%tds(i)%d(j)%re = d_aux(j) + k_hel*0.5d0*(t(j)%re+t(j+m)%re)
         this%tds(i)%d(j)%im = 0.d0
       end do
       this%tds(i)%u=this%tds(i)%e
