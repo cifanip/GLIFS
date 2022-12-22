@@ -227,8 +227,8 @@ contains
     im=(0.d0,1.d0)
     
     do i=1,n
-      x=(4.d0/3.d0)*sqrt(pi/n)
-      y=-(4.d0/3.d0)*sqrt(pi/5.d0)
+      x=(2.d0/3.d0)*sqrt(pi/n)
+      y=(4.d0/3.d0)*sqrt(pi/5.d0)
       t(i) = im*(x+y*t(i))
     end do
     
