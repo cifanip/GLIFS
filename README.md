@@ -12,4 +12,4 @@ You can acknowledge the use of this code in any scientific publication/work usin
 [P. Cifani et al. - An efficient geometric method for incompressible hydrodynamics on the sphere](https://www.sciencedirect.com/science/article/pii/S002199912200835X)
 
 ### CONTACTS
-If you are interested or have questions about this project, please send an email to p.cifani@utwente.nl
+If you are interested or have questions about this project, please send an email to cifani.pl@gmail.com
